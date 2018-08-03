@@ -2,7 +2,7 @@
 configuration management system for academic and industrial research
 projects.
 
-See README.md.
+See README.md for usage and examples.
 """
 
 from __future__ import absolute_import
@@ -22,6 +22,10 @@ logger = logging.getLogger(__name__)
 
 
 class CfgNode(dict):
+    """
+    CfgNode represents an internal node in the configuration tree. It's a simple
+    dict-like container that allows for attribute-based access to keys.
+    """
 
     IMMUTABLE = "__immutable__"
     DEPRECATED_KEYS = "__deprecated_keys__"
@@ -29,20 +33,17 @@ class CfgNode(dict):
 
     def __init__(self, *args, **kwargs):
         super(CfgNode, self).__init__(*args, **kwargs)
+        # Manage if the CfgNode is frozen or not
         self.__dict__[CfgNode.IMMUTABLE] = False
-        # ---------------------------------------------------------------------------- #
         # Deprecated options
         # If an option is removed from the code and you don't want to break existing
         # yaml configs, you can add the full config key as a string to the set below.
-        # ---------------------------------------------------------------------------- #
         self.__dict__[CfgNode.DEPRECATED_KEYS] = set()
-        # ---------------------------------------------------------------------------- #
         # Renamed options
         # If you rename a config option, record the mapping from the old name to the new
         # name in the dictionary below. Optionally, if the type also changed, you can
         # make the value a tuple that specifies first the renamed key and then
         # instructions for how to edit the config file.
-        # ---------------------------------------------------------------------------- #
         self.__dict__[CfgNode.RENAMED_KEYS] = {
             # 'EXAMPLE.OLD.KEY': 'EXAMPLE.NEW.KEY',  # Dummy example to follow
             # 'EXAMPLE.OLD.KEY': (                   # A more complex example to follow
@@ -74,22 +75,22 @@ class CfgNode(dict):
             )
 
     def dump(self):
-        """Dump cfg to a string."""
+        """Dump to a string."""
         return yaml.dump(self)
 
     def merge_from_file(self, cfg_filename):
-        """Load a yaml config file and merge it into the global config."""
+        """Load a yaml config file and merge it this CfgNode."""
         with open(cfg_filename, "r") as f:
             yaml_cfg = CfgNode(load_cfg(f))
         _merge_a_into_b(yaml_cfg, self, self)
 
     def merge_from_other_cfg(self, cfg_other):
-        """Merge `cfg_other` into the global config."""
+        """Merge `cfg_other` into this CfgNode."""
         _merge_a_into_b(cfg_other, self, self)
 
     def merge_from_list(self, cfg_list):
-        """Merge config keys, values in a list (e.g., from command line) into the
-        global config. For example, `cfg_list = ['TEST.NMS', 0.5]`.
+        """Merge config (keys, values) in a list (e.g., from command line) into
+        this CfgNode. For example, `cfg_list = ['FOO.BAR', 0.5]`.
         """
         assert len(cfg_list) % 2 == 0
         root = self
@@ -110,12 +111,15 @@ class CfgNode(dict):
             d[subkey] = value
 
     def freeze(self):
+        """Make this CfgNode and all of its children immutable."""
         self._immutable(True)
 
     def defrost(self):
+        """Make this CfgNode and all of its children mutable."""
         self._immutable(False)
 
     def is_frozen(self):
+        """Return mutability."""
         return self.__dict__[CfgNode.IMMUTABLE]
 
     def _immutable(self, is_immutable):
@@ -131,13 +135,24 @@ class CfgNode(dict):
             if isinstance(v, CfgNode):
                 v._immutable(is_immutable)
 
+    def clone(self):
+        """Recursively copy this CfgNode."""
+        return copy.deepcopy(self)
+
     def register_deprecated_key(self, key):
+        """Register key (e.g. `FOO.BAR`) a deprecated option. When merging deprecated
+        keys a warning is generated and the key is ignored.
+        """
         assert (
             key not in self.__dict__[CfgNode.DEPRECATED_KEYS]
         ), "key '{}' is already registered as a deprecated key".format(key)
         self.__dict__[CfgNode.DEPRECATED_KEYS].add(key)
 
     def register_renamed_key(self, old_name, new_name, message=None):
+        """Register a key as having been renamed from `old_name` to `new_name`.
+        When merging a renamed key, an exception is thrown alerting to user to
+        the fact that the key has been renamed.
+        """
         assert (
             old_name not in self.__dict__[CfgNode.RENAMED_KEYS]
         ), "key '{}' is already registered as a renamed cfg key".format(old_name)
@@ -147,12 +162,14 @@ class CfgNode(dict):
         self.__dict__[CfgNode.RENAMED_KEYS][old_name] = value
 
     def key_is_deprecated(self, full_key):
+        """Test if a key is deprecated."""
         if full_key in self.__dict__[CfgNode.DEPRECATED_KEYS]:
             logger.warning("Deprecated config key (ignoring): {}".format(full_key))
             return True
         return False
 
     def key_is_renamed(self, full_key):
+        """Test if a key is renamed."""
         return full_key in self.__dict__[CfgNode.RENAMED_KEYS]
 
     def raise_key_rename_error(self, full_key):
@@ -171,6 +188,7 @@ class CfgNode(dict):
 
 def load_cfg(cfg_file_or_string):
     """Load a cfg from a file or string."""
+    # TODO: py2 support?
     assert isinstance(
         cfg_file_or_string, (io.IOBase, str)
     ), "Expected {} or {} got {}".format(io.IOBase, str, type(cfg_file_or_string))

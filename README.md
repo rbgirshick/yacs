@@ -6,7 +6,7 @@ reference point for all configurable options. It should be very
 well documented and provide sensible defaults for all options.
 
 ```python
-# config.py
+# my_project/config.py
 from yacs.config import CfgNode as CN
 
 
@@ -33,7 +33,7 @@ one for each experiment. Each configuration file only overrides the
 options that are changing in that experiment.
 
 ```yaml
-# my_experiment.yaml
+# my_project/experiment.yaml
 SYSTEM:
   NUM_GPUS: 2
 TRAIN:
@@ -41,20 +41,31 @@ TRAIN:
 ```
 
 Finally, you'll have your actual project code that uses the config
-system. Since the cfg is global, after any initial setup it's a good
-idea to freeze it (by calling the `freeze()` method).
+system. After any initial setup it's a good idea to freeze it to
+prevent further modification by calling the `freeze()` method. As
+illustrated below, the config options can either be used a global
+set of options by importing `cfg` and accessing it directly, or
+the `cfg` can be copied and passed as an argument.
 
 ```python
-# main.py
+# my_project/main.py
 import pprint
 
+import my_project
 from config import cfg
 
 
 if __name__ == "__main__":
-  cfg.merge_from_file("my_experiment.yaml")
+  cfg.merge_from_file("experiment.yaml")
   cfg.freeze()
   pprint.pprint(cfg)
+
+  # Example of using the cfg as global access to options
+  if cfg.SYSTEM.NUM_GPUS > 0:
+    my_project.setup_multi_gpu_support()
+
+  # Example of using a (non-global) copy of the config
+  model = my_project.create_model(cfg.clone())
 ```
 
 ### Additional Options and Tips

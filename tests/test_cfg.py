@@ -3,7 +3,6 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-import copy
 import tempfile
 import unittest
 
@@ -73,16 +72,16 @@ class TestCfgNode(unittest.TestCase):
 class TestCfg(unittest.TestCase):
     def test_copy_cfg(self):
         cfg = get_cfg()
-        cfg2 = copy.deepcopy(cfg)
+        cfg2 = cfg.clone()
         s = cfg.MODEL.TYPE
         cfg2.MODEL.TYPE = "dummy"
         assert cfg.MODEL.TYPE == s
 
     def test_merge_cfg_from_cfg(self):
-        # Test: merge from deepcopy
+        # Test: merge from clone
         cfg = get_cfg()
         s = "dummy0"
-        cfg2 = copy.deepcopy(cfg)
+        cfg2 = cfg.clone()
         cfg2.MODEL.TYPE = s
         cfg.merge_from_other_cfg(cfg2)
         assert cfg.MODEL.TYPE == s
@@ -170,7 +169,7 @@ class TestCfg(unittest.TestCase):
         #   "Deprecated config key (ignoring): MODEL.DILATION"
         cfg = get_cfg()
         with tempfile.NamedTemporaryFile("wt") as f:
-            cfg2 = copy.deepcopy(cfg)
+            cfg2 = cfg.clone()
             cfg2.MODEL.DILATION = 2
             f.write(cfg2.dump())
             f.flush()
@@ -191,7 +190,7 @@ class TestCfg(unittest.TestCase):
     def test_renamed_key_from_file(self):
         cfg = get_cfg()
         with tempfile.NamedTemporaryFile("wt") as f:
-            cfg2 = copy.deepcopy(cfg)
+            cfg2 = cfg.clone()
             cfg2.EXAMPLE = CN()
             cfg2.EXAMPLE.RENAMED = CN()
             cfg2.EXAMPLE.RENAMED.KEY = "foobar"
