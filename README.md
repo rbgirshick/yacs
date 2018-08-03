@@ -5,6 +5,9 @@ file, typically called `config.py`. This file is the one-stop
 reference point for all configurable options. It should be very
 well documented and provide sensible defaults for all options.
 
+See [example](example)
+for code that uses YACS or keep reading below.
+
 ```python
 # my_project/config.py
 from yacs.config import CfgNode as CN
