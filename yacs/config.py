@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 # CfgNodes can only contain a limited set of valid types
-_VALID_TYPES = {dict, tuple, list, str, int, float}
+_VALID_TYPES = {dict, tuple, list, str, int, float, bool}
 
 
 class CfgNode(dict):
