@@ -58,22 +58,23 @@ class CfgNode(dict):
             raise AttributeError(name)
 
     def __setattr__(self, name, value):
-        if not self.__dict__[CfgNode.IMMUTABLE]:
-            if name in self.__dict__:
-                self.__dict__[name] = value
-            else:
-                assert _valid_type(
-                    value, allow_cfg_node=True
-                ), "Invalid type {} for key {}; valid types = {}".format(
-                    type(value), name, _VALID_TYPES
-                )
-                self[name] = value
-        else:
+        if self.is_frozen():
             raise AttributeError(
                 'Attempted to set "{}" to "{}", but CfgNode is immutable'.format(
                     name, value
                 )
             )
+
+        assert (
+            name not in self.__dict__
+        ), "Invalid attempt to modify internal CfgNode state"
+        assert _valid_type(
+            value, allow_cfg_node=True
+        ), "Invalid type {} for key {}; valid types = {}".format(
+            type(value), name, _VALID_TYPES
+        )
+
+        self[name] = value
 
     def dump(self):
         """Dump to a string."""
