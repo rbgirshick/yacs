@@ -57,12 +57,6 @@ class TestCfgNode(unittest.TestCase):
             a.level1.bar = 1
         assert a.level1.level2.foo == 0
 
-        # Serialize immutability state
-        a.freeze()
-        a2 = yacs.config.load_cfg(a.dump())
-        assert a.is_frozen()
-        assert a2.is_frozen()
-
 
 class TestCfg(unittest.TestCase):
     def test_copy_cfg(self):
@@ -195,6 +189,11 @@ class TestCfg(unittest.TestCase):
                 _ = cfg.EXAMPLE.RENAMED.KEY  # noqa
             with self.assertRaises(KeyError):
                 cfg.merge_from_file(f.name)
+
+    def test_invalid_type(self):
+        cfg = get_cfg()
+        with self.assertRaises(AssertionError):
+            cfg.INVALID_KEY_TYPE = object()
 
 
 if __name__ == "__main__":

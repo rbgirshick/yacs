@@ -10,10 +10,13 @@ import io
 import logging
 from ast import literal_eval
 
-import numpy as np
 import yaml
 
 logger = logging.getLogger(__name__)
+
+
+# CfgNodes can only contain a limited set of valid types
+_VALID_TYPES = {dict, tuple, list, str, int, float}
 
 
 class CfgNode(dict):
@@ -49,9 +52,7 @@ class CfgNode(dict):
         }
 
     def __getattr__(self, name):
-        if name in self.__dict__:
-            return self.__dict__[name]
-        elif name in self:
+        if name in self:
             return self[name]
         else:
             raise AttributeError(name)
@@ -61,6 +62,11 @@ class CfgNode(dict):
             if name in self.__dict__:
                 self.__dict__[name] = value
             else:
+                assert _valid_type(
+                    value, allow_cfg_node=True
+                ), "Invalid type {} for key {}; valid types = {}".format(
+                    type(value), name, _VALID_TYPES
+                )
                 self[name] = value
         else:
             raise AttributeError(
@@ -71,13 +77,14 @@ class CfgNode(dict):
 
     def dump(self):
         """Dump to a string."""
-        return yaml.dump(self)
+        self_as_dict = _to_dict(self)
+        return yaml.safe_dump(self_as_dict)
 
     def merge_from_file(self, cfg_filename):
         """Load a yaml config file and merge it this CfgNode."""
         with open(cfg_filename, "r") as f:
-            yaml_cfg = CfgNode(load_cfg(f))
-        _merge_a_into_b(yaml_cfg, self, self)
+            cfg = CfgNode(load_cfg(f))
+        _merge_a_into_b(cfg, self, self)
 
     def merge_from_other_cfg(self, cfg_other):
         """Merge `cfg_other` into this CfgNode."""
@@ -189,7 +196,44 @@ def load_cfg(cfg_file_or_string):
     ), "Expected {} or {} got {}".format(io.IOBase, str, type(cfg_file_or_string))
     if isinstance(cfg_file_or_string, io.IOBase):
         cfg_file_or_string = "".join(cfg_file_or_string.readlines())
-    return yaml.load(cfg_file_or_string)
+    cfg_as_dict = yaml.safe_load(cfg_file_or_string)
+    return _to_cfg_node(cfg_as_dict)
+
+
+def _to_dict(cfg_node):
+    """Recursively convert all CfgNode objects to dict objects."""
+
+    def convert_to_dict(cfg_node):
+        if not isinstance(cfg_node, CfgNode):
+            assert _valid_type(cfg_node)
+            return cfg_node
+        else:
+            cfg_dict = dict(cfg_node)
+            for k, v in cfg_dict.items():
+                cfg_dict[k] = convert_to_dict(v)
+            return cfg_dict
+
+    return convert_to_dict(cfg_node)
+
+
+def _to_cfg_node(cfg_dict):
+    """Recursively convert all dict objects to CfgNode objects."""
+
+    def convert_to_cfg_node(cfg_dict):
+        if type(cfg_dict) is not dict:
+            assert _valid_type(cfg_dict)
+            return cfg_dict
+        else:
+            cfg_node = CfgNode(cfg_dict)
+            for k, v in cfg_node.items():
+                cfg_node[k] = convert_to_cfg_node(v)
+            return cfg_node
+
+    return convert_to_cfg_node(cfg_dict)
+
+
+def _valid_type(value, allow_cfg_node=False):
+    return (type(value) in _VALID_TYPES) or (allow_cfg_node and type(value) == CfgNode)
 
 
 def _merge_a_into_b(a, b, root, stack=None):
@@ -274,9 +318,7 @@ def _check_and_coerce_cfg_value_type(value_a, value_b, key, full_key):
         return value_a
 
     # Exceptions: numpy arrays, strings, tuple<->list
-    if isinstance(value_b, np.ndarray):
-        value_a = np.array(value_a, dtype=value_b.dtype)
-    elif isinstance(value_b, str):
+    if isinstance(value_b, str):
         value_a = str(value_a)
     elif isinstance(value_a, tuple) and isinstance(value_b, list):
         value_a = list(value_a)

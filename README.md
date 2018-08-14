@@ -79,4 +79,4 @@ TODO:
 
 ### Bugs
 
-- Change `yaml.load` to `yaml.safe_load`
+- Python2 not supported
