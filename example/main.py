@@ -2,7 +2,6 @@ import pprint
 
 from config import cfg
 
-
 if __name__ == "__main__":
     cfg.merge_from_file("config.yaml")
     cfg.freeze()

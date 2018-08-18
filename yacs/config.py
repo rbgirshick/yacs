@@ -12,6 +12,12 @@ from ast import literal_eval
 
 import yaml
 
+# py2 and py3 compatability for isinstance(..., file)
+try:
+    _FILE_TYPES = (file, io.IOBase)
+except NameError:
+    _FILE_TYPES = (io.IOBase,)
+
 logger = logging.getLogger(__name__)
 
 
@@ -191,11 +197,10 @@ class CfgNode(dict):
 
 def load_cfg(cfg_file_or_string):
     """Load a cfg from a file or string."""
-    # TODO: py2 support?
     assert isinstance(
-        cfg_file_or_string, (io.IOBase, str)
-    ), "Expected {} or {} got {}".format(io.IOBase, str, type(cfg_file_or_string))
-    if isinstance(cfg_file_or_string, io.IOBase):
+        cfg_file_or_string, _FILE_TYPES + (str,)
+    ), "Expected {} or {} got {}".format(_FILE_TYPES, str, type(cfg_file_or_string))
+    if isinstance(cfg_file_or_string, _FILE_TYPES):
         cfg_file_or_string = "".join(cfg_file_or_string.readlines())
     cfg_as_dict = yaml.safe_load(cfg_file_or_string)
     return _to_cfg_node(cfg_as_dict)

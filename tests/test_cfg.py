@@ -1,3 +1,4 @@
+import logging
 import tempfile
 import unittest
 
@@ -197,4 +198,5 @@ class TestCfg(unittest.TestCase):
 
 
 if __name__ == "__main__":
+    logging.basicConfig()
     unittest.main()
