@@ -12,7 +12,7 @@ from ast import literal_eval
 
 import yaml
 
-# py2 and py3 compatability for isinstance(..., file)
+# py2 and py3 compatibility for isinstance(..., file)
 try:
     _FILE_TYPES = (file, io.IOBase)
 except NameError:
