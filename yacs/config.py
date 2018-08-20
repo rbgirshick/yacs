@@ -26,7 +26,7 @@ _VALID_TYPES = {dict, tuple, list, str, int, float, bool}
 # py2 allow for str and unicode
 try:
     _VALID_TYPES = _VALID_TYPES.union({unicode})
-except Exception as e:
+except Exception as _ignore:
     pass
 
 
@@ -317,27 +317,43 @@ def _decode_cfg_value(v):
     return v
 
 
-def _check_and_coerce_cfg_value_type(value_a, value_b, key, full_key):
-    """Checks that `value_a`, which is intended to replace `value_b` is of the
-    right type. The type is correct if it matches exactly or is one of a few
+def _check_and_coerce_cfg_value_type(replacement, original, key, full_key):
+    """Checks that `replacement`, which is intended to replace `original` is of
+    the right type. The type is correct if it matches exactly or is one of a few
     cases in which the type can be easily coerced.
     """
-    # The types must match (with some exceptions)
-    type_b = type(value_b)
-    type_a = type(value_a)
-    if type_a is type_b:
-        return value_a
+    original_type = type(original)
+    replacement_type = type(replacement)
 
-    # Exceptions: numpy arrays, strings, tuple<->list
-    if isinstance(value_b, str):
-        value_a = str(value_a)
-    elif isinstance(value_a, tuple) and isinstance(value_b, list):
-        value_a = list(value_a)
-    elif isinstance(value_a, list) and isinstance(value_b, tuple):
-        value_a = tuple(value_a)
-    else:
-        raise ValueError(
-            "Type mismatch ({} vs. {}) with values ({} vs. {}) for config "
-            "key: {}".format(type_b, type_a, value_b, value_a, full_key)
+    # The types must match (with some exceptions)
+    if replacement_type == original_type:
+        return replacement
+
+    # Cast replacement from from_type to to_type if the replacement and original
+    # types match from_type and to_type
+    def conditional_cast(from_type, to_type):
+        if replacement_type == from_type and original_type == to_type:
+            return True, to_type(replacement)
+        else:
+            return False, None
+
+    # Conditionally casts
+    # list <-> tuple
+    casts = [(tuple, list), (list, tuple)]
+    # For py2: allow converting from str (bytes) to a unicode string
+    try:
+        casts.append((str, unicode))
+    except Exception as _ignore:
+        pass
+
+    for (from_type, to_type) in casts:
+        converted, converted_value = conditional_cast(from_type, to_type)
+        if converted:
+            return converted_value
+
+    raise ValueError(
+        "Type mismatch ({} vs. {}) with values ({} vs. {}) for config "
+        "key: {}".format(
+            original_type, replacement_type, original, replacement, full_key
         )
-    return value_a
+    )

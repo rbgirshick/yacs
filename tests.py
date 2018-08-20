@@ -5,6 +5,12 @@ import unittest
 import yacs.config
 from yacs.config import CfgNode as CN
 
+try:
+    _ignore = unicode
+    PY2 = True
+except Exception as _ignore:
+    PY2 = False
+
 
 def get_cfg():
     cfg = CN()
@@ -106,6 +112,15 @@ class TestCfg(unittest.TestCase):
         cfg.merge_from_other_cfg(cfg2)
         assert type(cfg.TRAIN.SCALES) is tuple
         assert cfg.TRAIN.SCALES[0] == 1
+
+        # Test str (bytes) <-> unicode conversion for py2
+        if PY2:
+            cfg.A_UNICODE_KEY = u"foo"
+            cfg2 = CN()
+            cfg2.A_UNICODE_KEY = b"bar"
+            cfg.merge_from_other_cfg(cfg2)
+            assert type(cfg.A_UNICODE_KEY) == unicode
+            assert cfg.A_UNICODE_KEY == u"bar"
 
         # Test: merge with invalid type
         cfg2 = CN()

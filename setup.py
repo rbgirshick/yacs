@@ -6,6 +6,6 @@ setup(
     author="Ross Girshick",
     author_email="ross.girshick@gmail.com",
     description="Yet Another Configuration System",
-    packages=["yacs", "tests"],
+    packages=["yacs"],
     long_description="A simple configuration system for research",
 )

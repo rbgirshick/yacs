@@ -4,3 +4,4 @@ yacs.egg-info
 yacs/__pycache__
 example/__pycache__
 .tox
+**/*.pyc
