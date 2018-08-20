@@ -76,7 +76,3 @@ if __name__ == "__main__":
 TODO:
 - document command line overrides
 - give usual tips
-
-### Bugs
-
-- Python2 not supported
