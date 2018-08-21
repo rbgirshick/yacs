@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name="yacs",
-    version="0.1.1",
+    version="0.1.2",
     author="Ross Girshick",
     author_email="ross.girshick@gmail.com",
     description="Yet Another Configuration System",
@@ -16,5 +16,8 @@ setup(
         "Operating System :: OS Independent",
         "Intended Audience :: Science/Research",
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    ],
+    install_requires=[
+        "PyYAML",
     ],
 )
