@@ -6,7 +6,7 @@ import yacs.config
 from yacs.config import CfgNode as CN
 
 try:
-    _ignore = unicode
+    _ignore = unicode  # noqa: F821
     PY2 = True
 except Exception as _ignore:
     PY2 = False
@@ -119,7 +119,7 @@ class TestCfg(unittest.TestCase):
             cfg2 = CN()
             cfg2.A_UNICODE_KEY = b"bar"
             cfg.merge_from_other_cfg(cfg2)
-            assert type(cfg.A_UNICODE_KEY) == unicode
+            assert type(cfg.A_UNICODE_KEY) == unicode  # noqa: F821
             assert cfg.A_UNICODE_KEY == u"bar"
 
         # Test: merge with invalid type
@@ -169,6 +169,18 @@ class TestCfg(unittest.TestCase):
         with self.assertRaises(AttributeError):
             _ = cfg.MODEL.DILATION  # noqa
 
+    def test_nonexistant_key_from_list(self):
+        cfg = get_cfg()
+        opts = ["MODEL.DOES_NOT_EXIST", "IGNORE"]
+        with self.assertRaises(AssertionError):
+            cfg.merge_from_list(opts)
+
+    def test_load_cfg_invalid_type(self):
+        # FOO.BAR.QUUX will have type None, which is not allowed
+        cfg_string = "FOO:\n BAR:\n  QUUX:"
+        with self.assertRaises(AssertionError):
+            yacs.config.load_cfg(cfg_string)
+
     def test_deprecated_key_from_file(self):
         # You should see logger messages like:
         #   "Deprecated config key (ignoring): MODEL.DILATION"
@@ -214,4 +226,6 @@ class TestCfg(unittest.TestCase):
 
 if __name__ == "__main__":
     logging.basicConfig()
+    yacs_logger = logging.getLogger("yacs.config")
+    yacs_logger.setLevel(logging.DEBUG)
     unittest.main()
