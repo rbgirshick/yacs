@@ -286,7 +286,7 @@ def _valid_type(value, allow_cfg_node=False):
     return (type(value) in _VALID_TYPES) or (allow_cfg_node and type(value) == CfgNode)
 
 
-def _merge_a_into_b(a, b, root, stack):
+def _merge_a_into_b(a, b, root, key_list):
     """Merge config dictionary a into config dictionary b, clobbering the
     options in b whenever they are also specified in a.
     """
@@ -300,7 +300,7 @@ def _merge_a_into_b(a, b, root, stack):
     )
 
     for k, v_ in a.items():
-        full_key = ".".join(stack + [k])
+        full_key = ".".join(key_list + [k])
         # a must specify keys that are in b
         if k not in b:
             if root.key_is_deprecated(full_key):
@@ -317,7 +317,7 @@ def _merge_a_into_b(a, b, root, stack):
         # Recursively merge dicts
         if isinstance(v, CfgNode):
             try:
-                _merge_a_into_b(v, b[k], root, stack + [k])
+                _merge_a_into_b(v, b[k], root, key_list + [k])
             except BaseException:
                 raise
         else:
