@@ -24,6 +24,17 @@ def get_cfg():
     cfg.MODEL = CN()
     cfg.MODEL.TYPE = "a_foo_model"
 
+    # Some extra stuff to test CfgNode.__str__
+    cfg.STR = CN()
+    cfg.STR.KEY1 = 1
+    cfg.STR.KEY2 = 2
+    cfg.STR.FOO = CN()
+    cfg.STR.FOO.KEY1 = 1
+    cfg.STR.FOO.KEY2 = 2
+    cfg.STR.FOO.BAR = CN()
+    cfg.STR.FOO.BAR.KEY1 = 1
+    cfg.STR.FOO.BAR.KEY2 = 2
+
     cfg.register_deprecated_key("FINAL_MSG")
     cfg.register_deprecated_key("MODEL.DILATION")
 
@@ -228,4 +239,6 @@ if __name__ == "__main__":
     logging.basicConfig()
     yacs_logger = logging.getLogger("yacs.config")
     yacs_logger.setLevel(logging.DEBUG)
+    yacs_logger.debug("\n" + str(get_cfg()))
+    yacs_logger.debug("\n" + repr(get_cfg()))
     unittest.main()

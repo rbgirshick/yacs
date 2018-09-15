@@ -104,6 +104,30 @@ class CfgNode(dict):
 
         self[name] = value
 
+    def __str__(self):
+        def _indent(s_, num_spaces):
+            s = s_.split("\n")
+            if len(s) == 1:
+                return s_
+            first = s.pop(0)
+            s = [(num_spaces * " ") + line for line in s]
+            s = "\n".join(s)
+            s = first + "\n" + s
+            return s
+
+        r = ""
+        s = []
+        for k, v in sorted(self.items()):
+            seperator = "\n" if isinstance(v, CfgNode) else " "
+            attr_str = "{}:{}{}".format(str(k), seperator, str(v))
+            attr_str = _indent(attr_str, 2)
+            s.append(attr_str)
+        r += "\n".join(s)
+        return r
+
+    def __repr__(self):
+        return "{}({})".format(self.__class__.__name__, super(CfgNode, self).__repr__())
+
     def dump(self):
         """Dump to a string."""
         self_as_dict = _to_dict(self)

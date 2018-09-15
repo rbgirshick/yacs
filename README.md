@@ -52,7 +52,6 @@ the `cfg` can be copied and passed as an argument.
 
 ```python
 # my_project/main.py
-import pprint
 
 import my_project
 from config import cfg
@@ -61,7 +60,7 @@ from config import cfg
 if __name__ == "__main__":
   cfg.merge_from_file("experiment.yaml")
   cfg.freeze()
-  pprint.pprint(cfg)
+  print(cfg)
 
   # Example of using the cfg as global access to options
   if cfg.SYSTEM.NUM_GPUS > 0:
