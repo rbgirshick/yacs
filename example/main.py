@@ -1,5 +1,3 @@
-import pprint
-
 from config import cfg
 
 if __name__ == "__main__":
@@ -12,6 +10,6 @@ if __name__ == "__main__":
     cfg2.freeze()
 
     print("cfg:")
-    pprint.pprint(cfg)
+    print(cfg)
     print("cfg2:")
-    pprint.pprint(cfg2)
+    print(cfg2)
