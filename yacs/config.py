@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 
 # CfgNodes can only contain a limited set of valid types
-_VALID_TYPES = {dict, tuple, list, str, int, float, bool}
+_VALID_TYPES = {tuple, list, str, int, float, bool}
 # py2 allow for str and unicode
 try:
     _VALID_TYPES = _VALID_TYPES.union({unicode})  # noqa: F821
@@ -55,8 +55,23 @@ class CfgNode(dict):
     DEPRECATED_KEYS = "__deprecated_keys__"
     RENAMED_KEYS = "__renamed_keys__"
 
-    def __init__(self, *args, **kwargs):
-        super(CfgNode, self).__init__(*args, **kwargs)
+    def __init__(self, init_dict=None, key_list=None):
+        # Recursively convert nested dictionaries in init_dict into CfgNodes
+        init_dict = {} if init_dict is None else init_dict
+        key_list = [] if key_list is None else key_list
+        for k, v in init_dict.items():
+            if type(v) is dict:
+                # Convert dict to CfgNode
+                init_dict[k] = CfgNode(v, key_list=key_list + [k])
+            else:
+                # Check for valid leaf type or nested CfgNode
+                _assert_with_logging(
+                    _valid_type(v, allow_cfg_node=True),
+                    "Key {} with value {} is not a valid type; valid types: {}".format(
+                        ".".join(key_list + [k]), type(v), _VALID_TYPES
+                    ),
+                )
+        super(CfgNode, self).__init__(init_dict)
         # Manage if the CfgNode is frozen or not
         self.__dict__[CfgNode.IMMUTABLE] = False
         # Deprecated options
@@ -136,7 +151,7 @@ class CfgNode(dict):
     def merge_from_file(self, cfg_filename):
         """Load a yaml config file and merge it this CfgNode."""
         with open(cfg_filename, "r") as f:
-            cfg = CfgNode(load_cfg(f))
+            cfg = load_cfg(f)
         _merge_a_into_b(cfg, self, self, [])
 
     def merge_from_other_cfg(self, cfg_other):
@@ -259,9 +274,9 @@ def load_cfg(cfg_file_or_string):
         ),
     )
     if isinstance(cfg_file_or_string, _FILE_TYPES):
-        cfg_file_or_string = "".join(cfg_file_or_string.readlines())
+        cfg_file_or_string = cfg_file_or_string.read()
     cfg_as_dict = yaml.safe_load(cfg_file_or_string)
-    return _to_cfg_node(cfg_as_dict)
+    return CfgNode(cfg_as_dict)
 
 
 def _to_dict(cfg_node):
@@ -283,27 +298,6 @@ def _to_dict(cfg_node):
             return cfg_dict
 
     return convert_to_dict(cfg_node, [])
-
-
-def _to_cfg_node(cfg_dict):
-    """Recursively convert all dict objects to CfgNode objects."""
-
-    def convert_to_cfg_node(cfg_dict, key_list):
-        if type(cfg_dict) is not dict:
-            _assert_with_logging(
-                _valid_type(cfg_dict),
-                "Key {} with value {} is not a valid type; valid types: {}".format(
-                    ".".join(key_list), type(cfg_dict), _VALID_TYPES
-                ),
-            )
-            return cfg_dict
-        else:
-            cfg_node = CfgNode(cfg_dict)
-            for k, v in cfg_node.items():
-                cfg_node[k] = convert_to_cfg_node(v, key_list + [k])
-            return cfg_node
-
-    return convert_to_cfg_node(cfg_dict, [])
 
 
 def _valid_type(value, allow_cfg_node=False):

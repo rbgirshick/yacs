@@ -229,6 +229,14 @@ class TestCfg(unittest.TestCase):
             with self.assertRaises(KeyError):
                 cfg.merge_from_file(f.name)
 
+    def test_load_cfg_from_file(self):
+        cfg = get_cfg()
+        with tempfile.NamedTemporaryFile("wt") as f:
+            f.write(cfg.dump())
+            f.flush()
+            with open(f.name, "rt") as f_read:
+                yacs.config.load_cfg(f_read)
+
     def test_invalid_type(self):
         cfg = get_cfg()
         with self.assertRaises(AssertionError):
