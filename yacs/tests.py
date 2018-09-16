@@ -237,6 +237,16 @@ class TestCfg(unittest.TestCase):
             with open(f.name, "rt") as f_read:
                 yacs.config.load_cfg(f_read)
 
+    def test_load_from_python_file(self):
+        # Case 1: exports CfgNode
+        cfg = get_cfg()
+        cfg.merge_from_file("example/config_override.py")
+        assert cfg.TRAIN.HYPERPARAMETER_1 == 0.9
+        # Case 2: exports dict
+        cfg = get_cfg()
+        cfg.merge_from_file("example/config_override_from_dict.py")
+        assert cfg.TRAIN.HYPERPARAMETER_1 == 0.9
+
     def test_invalid_type(self):
         cfg = get_cfg()
         with self.assertRaises(AssertionError):

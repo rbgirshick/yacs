@@ -23,13 +23,16 @@ See README.md for usage and examples.
 import copy
 import io
 import logging
+import os
 from ast import literal_eval
 
 import yaml
 
+_PY2 = False
 # py2 and py3 compatibility for isinstance(..., file)
 try:
     _FILE_TYPES = (file, io.IOBase)
+    _PY2 = True
 except NameError:
     _FILE_TYPES = (io.IOBase,)
 
@@ -39,10 +42,13 @@ logger = logging.getLogger(__name__)
 # CfgNodes can only contain a limited set of valid types
 _VALID_TYPES = {tuple, list, str, int, float, bool}
 # py2 allow for str and unicode
-try:
+if _PY2:
     _VALID_TYPES = _VALID_TYPES.union({unicode})  # noqa: F821
-except Exception as _ignore:
-    pass
+
+if _PY2:
+    import imp
+else:
+    import importlib.util
 
 
 class CfgNode(dict):
@@ -152,7 +158,7 @@ class CfgNode(dict):
         """Load a yaml config file and merge it this CfgNode."""
         with open(cfg_filename, "r") as f:
             cfg = load_cfg(f)
-        _merge_a_into_b(cfg, self, self, [])
+        self.merge_from_other_cfg(cfg)
 
     def merge_from_other_cfg(self, cfg_other):
         """Merge `cfg_other` into this CfgNode."""
@@ -266,17 +272,55 @@ class CfgNode(dict):
 
 
 def load_cfg(cfg_file_or_string):
-    """Load a cfg from a file or string."""
+    """Load a cfg. Supports loading from:
+        - A file object backed by a YAML file
+        - A file object backed by a Python source file that exports an attribute
+          "cfg" that is either a dict or a CfgNode
+        - A string that can be parsed as valid YAML
+    """
     _assert_with_logging(
         isinstance(cfg_file_or_string, _FILE_TYPES + (str,)),
         "Expected first argument to be of type {} or {}, but it was {}".format(
             _FILE_TYPES, str, type(cfg_file_or_string)
         ),
     )
+    if isinstance(cfg_file_or_string, str):
+        cfg_as_dict = yaml.safe_load(cfg_file_or_string)
+        return CfgNode(cfg_as_dict)
     if isinstance(cfg_file_or_string, _FILE_TYPES):
-        cfg_file_or_string = cfg_file_or_string.read()
-    cfg_as_dict = yaml.safe_load(cfg_file_or_string)
-    return CfgNode(cfg_as_dict)
+        YAML_EXTS = {"", ".yaml", ".yml"}
+        PY_EXTS = {".py"}
+        _, file_extension = os.path.splitext(cfg_file_or_string.name)
+        if file_extension in YAML_EXTS:
+            cfg_file_or_string = cfg_file_or_string.read()
+            cfg_as_dict = yaml.safe_load(cfg_file_or_string)
+            return CfgNode(cfg_as_dict)
+        elif file_extension in PY_EXTS:
+            VALID_ATTR_TYPES = {dict, CfgNode}
+            module = _load_module(cfg_file_or_string)
+            _assert_with_logging(
+                hasattr(module, "cfg"),
+                "Python module from file {} must have 'cfg' attr".format(
+                    cfg_file_or_string.name
+                ),
+            )
+            _assert_with_logging(
+                type(module.cfg) in VALID_ATTR_TYPES,
+                "Imported module 'cfg' attr must be in {} but is {} instead".format(
+                    VALID_ATTR_TYPES, type(module.cfg)
+                ),
+            )
+            if type(module.cfg) is dict:
+                return CfgNode(module.cfg)
+            else:
+                return module.cfg
+        else:
+            raise Exception(
+                "Attempt to load from an unsupported file type {}; "
+                "only {} are supported".format(
+                    cfg_file_or_string, YAML_EXTS.union(PY_EXTS)
+                )
+            )
 
 
 def _to_dict(cfg_node):
@@ -421,3 +465,15 @@ def _assert_with_logging(cond, msg):
     if not cond:
         logger.debug(msg)
     assert cond, msg
+
+
+def _load_module(file_obj):
+    """Load a Python module from a file object."""
+    name = "yacs.config.override"
+    if _PY2:
+        module = imp.load_source(name, file_obj.name, file_obj)
+    else:
+        spec = importlib.util.spec_from_file_location(name, file_obj.name)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+    return module
