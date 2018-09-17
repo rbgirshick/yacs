@@ -234,11 +234,35 @@ class TestCfg(unittest.TestCase):
         with self.assertRaises(AssertionError):
             cfg.INVALID_KEY_TYPE = object()
 
+    def test__str__(self):
+        expected_str = """
+MODEL:
+  TYPE: a_foo_model
+NUM_GPUS: 8
+STR:
+  FOO:
+    BAR:
+      KEY1: 1
+      KEY2: 2
+    KEY1: 1
+    KEY2: 2
+  KEY1: 1
+  KEY2: 2
+TRAIN:
+  HYPERPARAMETER_1: 0.1
+  SCALES: (2, 4, 8, 16)
+""".strip()
+        cfg = get_cfg()
+        assert str(cfg) == expected_str
+
+    def test__repr__(self):
+        expected_str = "CfgNode({'NUM_GPUS': 8, 'TRAIN': CfgNode({'HYPERPARAMETER_1': 0.1, 'SCALES': (2, 4, 8, 16)}), 'MODEL': CfgNode({'TYPE': 'a_foo_model'}), 'STR': CfgNode({'KEY1': 1, 'KEY2': 2, 'FOO': CfgNode({'KEY1': 1, 'KEY2': 2, 'BAR': CfgNode({'KEY1': 1, 'KEY2': 2})})})})"  # noqa B950
+        cfg = get_cfg()
+        assert repr(cfg) == expected_str
+
 
 if __name__ == "__main__":
     logging.basicConfig()
     yacs_logger = logging.getLogger("yacs.config")
     yacs_logger.setLevel(logging.DEBUG)
-    yacs_logger.debug("\n" + str(get_cfg()))
-    yacs_logger.debug("\n" + repr(get_cfg()))
     unittest.main()
