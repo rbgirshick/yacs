@@ -23,26 +23,42 @@ See README.md for usage and examples.
 import copy
 import io
 import logging
+import os
 from ast import literal_eval
 
 import yaml
 
-# py2 and py3 compatibility for isinstance(..., file)
+
+# Flag for py2 and py3 compatibility to use when separate code paths are necessary
+# When _PY2 is False, we assume Python 3 is in use
+_PY2 = False
+
+# Filename extensions for loading configs from files
+_YAML_EXTS = {"", ".yaml", ".yml"}
+_PY_EXTS = {".py"}
+
+# py2 and py3 compatibility for checking file object type
+# We simply use this to infer py2 vs py3
 try:
     _FILE_TYPES = (file, io.IOBase)
+    _PY2 = True
 except NameError:
     _FILE_TYPES = (io.IOBase,)
 
-logger = logging.getLogger(__name__)
-
-
 # CfgNodes can only contain a limited set of valid types
-_VALID_TYPES = {dict, tuple, list, str, int, float, bool}
+_VALID_TYPES = {tuple, list, str, int, float, bool}
 # py2 allow for str and unicode
-try:
+if _PY2:
     _VALID_TYPES = _VALID_TYPES.union({unicode})  # noqa: F821
-except Exception as _ignore:
-    pass
+
+# Utilities for importing modules from file paths
+if _PY2:
+    # imp is available in both py2 and py3 for now, but is deprecated in py3
+    import imp
+else:
+    import importlib.util
+
+logger = logging.getLogger(__name__)
 
 
 class CfgNode(dict):
@@ -55,8 +71,23 @@ class CfgNode(dict):
     DEPRECATED_KEYS = "__deprecated_keys__"
     RENAMED_KEYS = "__renamed_keys__"
 
-    def __init__(self, *args, **kwargs):
-        super(CfgNode, self).__init__(*args, **kwargs)
+    def __init__(self, init_dict=None, key_list=None):
+        # Recursively convert nested dictionaries in init_dict into CfgNodes
+        init_dict = {} if init_dict is None else init_dict
+        key_list = [] if key_list is None else key_list
+        for k, v in init_dict.items():
+            if type(v) is dict:
+                # Convert dict to CfgNode
+                init_dict[k] = CfgNode(v, key_list=key_list + [k])
+            else:
+                # Check for valid leaf type or nested CfgNode
+                _assert_with_logging(
+                    _valid_type(v, allow_cfg_node=True),
+                    "Key {} with value {} is not a valid type; valid types: {}".format(
+                        ".".join(key_list + [k]), type(v), _VALID_TYPES
+                    ),
+                )
+        super(CfgNode, self).__init__(init_dict)
         # Manage if the CfgNode is frozen or not
         self.__dict__[CfgNode.IMMUTABLE] = False
         # Deprecated options
@@ -136,8 +167,8 @@ class CfgNode(dict):
     def merge_from_file(self, cfg_filename):
         """Load a yaml config file and merge it this CfgNode."""
         with open(cfg_filename, "r") as f:
-            cfg = CfgNode(load_cfg(f))
-        _merge_a_into_b(cfg, self, self, [])
+            cfg = load_cfg(f)
+        self.merge_from_other_cfg(cfg)
 
     def merge_from_other_cfg(self, cfg_other):
         """Merge `cfg_other` into this CfgNode."""
@@ -250,18 +281,65 @@ class CfgNode(dict):
         )
 
 
-def load_cfg(cfg_file_or_string):
-    """Load a cfg from a file or string."""
+def load_cfg(cfg_file_obj_or_str):
+    """Load a cfg. Supports loading from:
+        - A file object backed by a YAML file
+        - A file object backed by a Python source file that exports an attribute
+          "cfg" that is either a dict or a CfgNode
+        - A string that can be parsed as valid YAML
+    """
     _assert_with_logging(
-        isinstance(cfg_file_or_string, _FILE_TYPES + (str,)),
+        isinstance(cfg_file_obj_or_str, _FILE_TYPES + (str,)),
         "Expected first argument to be of type {} or {}, but it was {}".format(
-            _FILE_TYPES, str, type(cfg_file_or_string)
+            _FILE_TYPES, str, type(cfg_file_obj_or_str)
         ),
     )
-    if isinstance(cfg_file_or_string, _FILE_TYPES):
-        cfg_file_or_string = "".join(cfg_file_or_string.readlines())
-    cfg_as_dict = yaml.safe_load(cfg_file_or_string)
-    return _to_cfg_node(cfg_as_dict)
+    if isinstance(cfg_file_obj_or_str, str):
+        return _load_cfg_from_yaml_str(cfg_file_obj_or_str)
+    elif isinstance(cfg_file_obj_or_str, _FILE_TYPES):
+        return _load_cfg_from_file(cfg_file_obj_or_str)
+    else:
+        raise NotImplementedError("Impossible to reach here (unless there's a bug)")
+
+
+def _load_cfg_from_file(file_obj):
+    """Load a config from a YAML file or a Python source file."""
+    _, file_extension = os.path.splitext(file_obj.name)
+    if file_extension in _YAML_EXTS:
+        return _load_cfg_from_yaml_str(file_obj.read())
+    elif file_extension in _PY_EXTS:
+        return _load_cfg_py_source(file_obj.name)
+    else:
+        raise Exception(
+            "Attempt to load from an unsupported file type {}; "
+            "only {} are supported".format(file_obj, _YAML_EXTS.union(_PY_EXTS))
+        )
+
+
+def _load_cfg_from_yaml_str(str_obj):
+    """Load a config from a YAML string encoding."""
+    cfg_as_dict = yaml.safe_load(str_obj)
+    return CfgNode(cfg_as_dict)
+
+
+def _load_cfg_py_source(filename):
+    """Load a config from a Python source file."""
+    module = _load_module_from_file("yacs.config.override", filename)
+    _assert_with_logging(
+        hasattr(module, "cfg"),
+        "Python module from file {} must have 'cfg' attr".format(filename),
+    )
+    VALID_ATTR_TYPES = {dict, CfgNode}
+    _assert_with_logging(
+        type(module.cfg) in VALID_ATTR_TYPES,
+        "Imported module 'cfg' attr must be in {} but is {} instead".format(
+            VALID_ATTR_TYPES, type(module.cfg)
+        ),
+    )
+    if type(module.cfg) is dict:
+        return CfgNode(module.cfg)
+    else:
+        return module.cfg
 
 
 def _to_dict(cfg_node):
@@ -283,27 +361,6 @@ def _to_dict(cfg_node):
             return cfg_dict
 
     return convert_to_dict(cfg_node, [])
-
-
-def _to_cfg_node(cfg_dict):
-    """Recursively convert all dict objects to CfgNode objects."""
-
-    def convert_to_cfg_node(cfg_dict, key_list):
-        if type(cfg_dict) is not dict:
-            _assert_with_logging(
-                _valid_type(cfg_dict),
-                "Key {} with value {} is not a valid type; valid types: {}".format(
-                    ".".join(key_list), type(cfg_dict), _VALID_TYPES
-                ),
-            )
-            return cfg_dict
-        else:
-            cfg_node = CfgNode(cfg_dict)
-            for k, v in cfg_node.items():
-                cfg_node[k] = convert_to_cfg_node(v, key_list + [k])
-            return cfg_node
-
-    return convert_to_cfg_node(cfg_dict, [])
 
 
 def _valid_type(value, allow_cfg_node=False):
@@ -427,3 +484,13 @@ def _assert_with_logging(cond, msg):
     if not cond:
         logger.debug(msg)
     assert cond, msg
+
+
+def _load_module_from_file(name, filename):
+    if _PY2:
+        module = imp.load_source(name, filename)
+    else:
+        spec = importlib.util.spec_from_file_location(name, filename)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+    return module

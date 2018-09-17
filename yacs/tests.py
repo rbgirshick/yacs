@@ -229,6 +229,24 @@ class TestCfg(unittest.TestCase):
             with self.assertRaises(KeyError):
                 cfg.merge_from_file(f.name)
 
+    def test_load_cfg_from_file(self):
+        cfg = get_cfg()
+        with tempfile.NamedTemporaryFile("wt") as f:
+            f.write(cfg.dump())
+            f.flush()
+            with open(f.name, "rt") as f_read:
+                yacs.config.load_cfg(f_read)
+
+    def test_load_from_python_file(self):
+        # Case 1: exports CfgNode
+        cfg = get_cfg()
+        cfg.merge_from_file("example/config_override.py")
+        assert cfg.TRAIN.HYPERPARAMETER_1 == 0.9
+        # Case 2: exports dict
+        cfg = get_cfg()
+        cfg.merge_from_file("example/config_override_from_dict.py")
+        assert cfg.TRAIN.HYPERPARAMETER_1 == 0.9
+
     def test_invalid_type(self):
         cfg = get_cfg()
         with self.assertRaises(AssertionError):
@@ -254,11 +272,6 @@ TRAIN:
 """.strip()
         cfg = get_cfg()
         assert str(cfg) == expected_str
-
-    def test__repr__(self):
-        expected_str = "CfgNode({'NUM_GPUS': 8, 'TRAIN': CfgNode({'HYPERPARAMETER_1': 0.1, 'SCALES': (2, 4, 8, 16)}), 'MODEL': CfgNode({'TYPE': 'a_foo_model'}), 'STR': CfgNode({'KEY1': 1, 'KEY2': 2, 'FOO': CfgNode({'KEY1': 1, 'KEY2': 2, 'BAR': CfgNode({'KEY1': 1, 'KEY2': 2})})})})"  # noqa B950
-        cfg = get_cfg()
-        assert repr(cfg) == expected_str
 
 
 if __name__ == "__main__":
