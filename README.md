@@ -72,6 +72,21 @@ if __name__ == "__main__":
 
 ### Additional Options and Tips
 
-TODO:
-- document command line overrides
-- give usual tips
+#### Command line overrides
+
+You can update a `CfgNode` using a list of fully-qualified key, value pairs.
+This makes it easy to consume override options from the command line. For example:
+
+```python
+cfg.merge_from_file("experiment.yaml")
+# Now override from a list (opts could come from the command line)
+opts = ["SYSTEM.NUM_GPUS", 8, "TRAIN.SCALES", "(1, 2, 3, 4)"]
+cfg.merge_from_list(opts)
+```
+
+#### Python config files (instead of YAML)
+
+`yacs>= 0.1.4` supports loading `CfgNode` objects from Python source files. The
+convention is that the Python source must export a module variable named `cfg` of
+type `dict` or `CfgNode`. See examples using a [CfgNode](example/config_override.py)
+and a [dict](example/config_override_from_dict.py) as well as usage in the unit tests.
