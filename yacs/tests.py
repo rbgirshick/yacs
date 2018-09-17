@@ -273,11 +273,6 @@ TRAIN:
         cfg = get_cfg()
         assert str(cfg) == expected_str
 
-    def test__repr__(self):
-        expected_str = "CfgNode({'NUM_GPUS': 8, 'TRAIN': CfgNode({'HYPERPARAMETER_1': 0.1, 'SCALES': (2, 4, 8, 16)}), 'MODEL': CfgNode({'TYPE': 'a_foo_model'}), 'STR': CfgNode({'KEY1': 1, 'KEY2': 2, 'FOO': CfgNode({'KEY1': 1, 'KEY2': 2, 'BAR': CfgNode({'KEY1': 1, 'KEY2': 2})})})})"  # noqa B950
-        cfg = get_cfg()
-        assert repr(cfg) == expected_str
-
 
 if __name__ == "__main__":
     logging.basicConfig()

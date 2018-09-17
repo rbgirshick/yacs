@@ -28,16 +28,22 @@ from ast import literal_eval
 
 import yaml
 
+
+# Flag for py2 and py3 compatibility to use when separate code paths are necessary
+# When _PY2 is False, we assume Python 3 is in use
 _PY2 = False
-# py2 and py3 compatibility for isinstance(..., file)
+
+# Filename extensions for loading configs from files
+_YAML_EXTS = {"", ".yaml", ".yml"}
+_PY_EXTS = {".py"}
+
+# py2 and py3 compatibility for checking file object type
+# We simply use this to infer py2 vs py3
 try:
     _FILE_TYPES = (file, io.IOBase)
     _PY2 = True
 except NameError:
     _FILE_TYPES = (io.IOBase,)
-
-logger = logging.getLogger(__name__)
-
 
 # CfgNodes can only contain a limited set of valid types
 _VALID_TYPES = {tuple, list, str, int, float, bool}
@@ -45,10 +51,14 @@ _VALID_TYPES = {tuple, list, str, int, float, bool}
 if _PY2:
     _VALID_TYPES = _VALID_TYPES.union({unicode})  # noqa: F821
 
+# Utilities for importing modules from file paths
 if _PY2:
+    # imp is available in both py2 and py3 for now, but is deprecated in py3
     import imp
 else:
     import importlib.util
+
+logger = logging.getLogger(__name__)
 
 
 class CfgNode(dict):
@@ -271,7 +281,7 @@ class CfgNode(dict):
         )
 
 
-def load_cfg(cfg_file_or_string):
+def load_cfg(cfg_file_obj_or_str):
     """Load a cfg. Supports loading from:
         - A file object backed by a YAML file
         - A file object backed by a Python source file that exports an attribute
@@ -279,48 +289,57 @@ def load_cfg(cfg_file_or_string):
         - A string that can be parsed as valid YAML
     """
     _assert_with_logging(
-        isinstance(cfg_file_or_string, _FILE_TYPES + (str,)),
+        isinstance(cfg_file_obj_or_str, _FILE_TYPES + (str,)),
         "Expected first argument to be of type {} or {}, but it was {}".format(
-            _FILE_TYPES, str, type(cfg_file_or_string)
+            _FILE_TYPES, str, type(cfg_file_obj_or_str)
         ),
     )
-    if isinstance(cfg_file_or_string, str):
-        cfg_as_dict = yaml.safe_load(cfg_file_or_string)
-        return CfgNode(cfg_as_dict)
-    if isinstance(cfg_file_or_string, _FILE_TYPES):
-        YAML_EXTS = {"", ".yaml", ".yml"}
-        PY_EXTS = {".py"}
-        _, file_extension = os.path.splitext(cfg_file_or_string.name)
-        if file_extension in YAML_EXTS:
-            cfg_file_or_string = cfg_file_or_string.read()
-            cfg_as_dict = yaml.safe_load(cfg_file_or_string)
-            return CfgNode(cfg_as_dict)
-        elif file_extension in PY_EXTS:
-            VALID_ATTR_TYPES = {dict, CfgNode}
-            module = _load_module(cfg_file_or_string)
-            _assert_with_logging(
-                hasattr(module, "cfg"),
-                "Python module from file {} must have 'cfg' attr".format(
-                    cfg_file_or_string.name
-                ),
-            )
-            _assert_with_logging(
-                type(module.cfg) in VALID_ATTR_TYPES,
-                "Imported module 'cfg' attr must be in {} but is {} instead".format(
-                    VALID_ATTR_TYPES, type(module.cfg)
-                ),
-            )
-            if type(module.cfg) is dict:
-                return CfgNode(module.cfg)
-            else:
-                return module.cfg
-        else:
-            raise Exception(
-                "Attempt to load from an unsupported file type {}; "
-                "only {} are supported".format(
-                    cfg_file_or_string, YAML_EXTS.union(PY_EXTS)
-                )
-            )
+    if isinstance(cfg_file_obj_or_str, str):
+        return _load_cfg_from_yaml_str(cfg_file_obj_or_str)
+    elif isinstance(cfg_file_obj_or_str, _FILE_TYPES):
+        return _load_cfg_from_file(cfg_file_obj_or_str)
+    else:
+        raise NotImplementedError("Impossible to reach here (unless there's a bug)")
+
+
+def _load_cfg_from_file(file_obj):
+    """Load a config from a YAML file or a Python source file."""
+    _, file_extension = os.path.splitext(file_obj.name)
+    if file_extension in _YAML_EXTS:
+        return _load_cfg_from_yaml_str(file_obj.read())
+    elif file_extension in _PY_EXTS:
+        return _load_cfg_py_source(file_obj.name)
+    else:
+        raise Exception(
+            "Attempt to load from an unsupported file type {}; "
+            "only {} are supported".format(file_obj, _YAML_EXTS.union(_PY_EXTS))
+        )
+
+
+def _load_cfg_from_yaml_str(str_obj):
+    """Load a config from a YAML string encoding."""
+    cfg_as_dict = yaml.safe_load(str_obj)
+    return CfgNode(cfg_as_dict)
+
+
+def _load_cfg_py_source(filename):
+    """Load a config from a Python source file."""
+    module = _load_module_from_file("yacs.config.override", filename)
+    _assert_with_logging(
+        hasattr(module, "cfg"),
+        "Python module from file {} must have 'cfg' attr".format(filename),
+    )
+    VALID_ATTR_TYPES = {dict, CfgNode}
+    _assert_with_logging(
+        type(module.cfg) in VALID_ATTR_TYPES,
+        "Imported module 'cfg' attr must be in {} but is {} instead".format(
+            VALID_ATTR_TYPES, type(module.cfg)
+        ),
+    )
+    if type(module.cfg) is dict:
+        return CfgNode(module.cfg)
+    else:
+        return module.cfg
 
 
 def _to_dict(cfg_node):
@@ -467,13 +486,11 @@ def _assert_with_logging(cond, msg):
     assert cond, msg
 
 
-def _load_module(file_obj):
-    """Load a Python module from a file object."""
-    name = "yacs.config.override"
+def _load_module_from_file(name, filename):
     if _PY2:
-        module = imp.load_source(name, file_obj.name, file_obj)
+        module = imp.load_source(name, filename)
     else:
-        spec = importlib.util.spec_from_file_location(name, file_obj.name)
+        spec = importlib.util.spec_from_file_location(name, filename)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
     return module
