@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name="yacs",
-    version="0.1.4",
+    version="0.1.5",
     author="Ross Girshick",
     author_email="ross.girshick@gmail.com",
     description="Yet Another Configuration System",
