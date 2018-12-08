@@ -130,7 +130,7 @@ class CfgNode(dict):
             "Invalid attempt to modify internal CfgNode state: {}".format(name),
         )
         _assert_with_logging(
-            _valid_type(value, allow_cfg_node=not self.is_new_allowed()),
+            _valid_type(value, allow_cfg_node=True),
             "Invalid type {} for key {}; valid types = {}".format(
                 type(value), name, _VALID_TYPES
             ),
@@ -403,9 +403,7 @@ def _merge_a_into_b(a, b, root, key_list):
             v = _check_and_coerce_cfg_value_type(v, b[k], k, full_key)
 
         # Recursively merge dicts
-        if isinstance(v, CfgNode):
-            if b.is_new_allowed():
-                raise ValueError("New values must be of valid type, valid types: {}".format(_VALID_TYPES))
+        if isinstance(v, CfgNode) and not (k not in b and b.is_new_allowed()):
             try:
                 _merge_a_into_b(v, b[k], root, key_list + [k])
             except BaseException:

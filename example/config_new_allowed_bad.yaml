@@ -1,4 +1,3 @@
 KWARGS:
-  a: 1
-  b:
-    c: 2
+  Y:
+    f: 4  # While `KWARGS` allows new nodes, `KWARGS.Y` doesn't, so this should raise an Exception
