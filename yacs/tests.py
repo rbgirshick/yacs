@@ -44,6 +44,11 @@ def get_cfg():
         message="Please update your config fil config file.",
     )
 
+    cfg.KWARGS = CN(new_allowed=True)
+    cfg.KWARGS.z = 0
+    cfg.KWARGS.Y = CN()
+    cfg.KWARGS.Y.X = 1
+
     return cfg
 
 
@@ -254,6 +259,10 @@ class TestCfg(unittest.TestCase):
 
     def test__str__(self):
         expected_str = """
+KWARGS:
+  Y:
+    X: 1
+  z: 0
 MODEL:
   TYPE: a_foo_model
 NUM_GPUS: 8
@@ -272,6 +281,18 @@ TRAIN:
 """.strip()
         cfg = get_cfg()
         assert str(cfg) == expected_str
+
+    def test_new_allowed(self):
+        cfg = get_cfg()
+        cfg.merge_from_file("example/config_new_allowed.yaml")
+        assert cfg.KWARGS.a == 1
+        assert cfg.KWARGS.B.c == 2
+        assert cfg.KWARGS.B.D.e == '3'
+
+    def test_new_allowed_bad(self):
+        cfg = get_cfg()
+        with self.assertRaises(KeyError):
+            cfg.merge_from_file("example/config_new_allowed_bad.yaml")
 
 
 if __name__ == "__main__":

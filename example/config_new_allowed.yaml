@@ -1,0 +1,6 @@
+KWARGS:
+  a: 1  # Test adding of basic value
+  B:
+    c: 2  # Test adding of another node
+    D:
+      e: '3'  # Test adding of nested nodes

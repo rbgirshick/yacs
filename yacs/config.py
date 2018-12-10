@@ -28,7 +28,6 @@ from ast import literal_eval
 
 import yaml
 
-
 # Flag for py2 and py3 compatibility to use when separate code paths are necessary
 # When _PY2 is False, we assume Python 3 is in use
 _PY2 = False
@@ -70,8 +69,9 @@ class CfgNode(dict):
     IMMUTABLE = "__immutable__"
     DEPRECATED_KEYS = "__deprecated_keys__"
     RENAMED_KEYS = "__renamed_keys__"
+    NEW_ALLOWED = "__new_allowed__"
 
-    def __init__(self, init_dict=None, key_list=None):
+    def __init__(self, init_dict=None, key_list=None, new_allowed=False):
         # Recursively convert nested dictionaries in init_dict into CfgNodes
         init_dict = {} if init_dict is None else init_dict
         key_list = [] if key_list is None else key_list
@@ -107,6 +107,9 @@ class CfgNode(dict):
             #     + "'foo:bar' -> ('foo', 'bar')"
             # ),
         }
+
+        # Allow new attributes after initialisation
+        self.__dict__[CfgNode.NEW_ALLOWED] = new_allowed
 
     def __getattr__(self, name):
         if name in self:
@@ -280,6 +283,9 @@ class CfgNode(dict):
             )
         )
 
+    def is_new_allowed(self):
+        return self.__dict__[CfgNode.NEW_ALLOWED]
+
 
 def load_cfg(cfg_file_obj_or_str):
     """Load a cfg. Supports loading from:
@@ -382,27 +388,29 @@ def _merge_a_into_b(a, b, root, key_list):
 
     for k, v_ in a.items():
         full_key = ".".join(key_list + [k])
-        # a must specify keys that are in b
-        if k not in b:
+
+        v = copy.deepcopy(v_)
+        v = _decode_cfg_value(v)
+
+        if k in b:
+            v = _check_and_coerce_cfg_value_type(v, b[k], k, full_key)
+            # Recursively merge dicts
+            if isinstance(v, CfgNode):
+                try:
+                    _merge_a_into_b(v, b[k], root, key_list + [k])
+                except BaseException:
+                    raise
+            else:
+                b[k] = v
+        elif b.is_new_allowed():
+            b[k] = v
+        else:
             if root.key_is_deprecated(full_key):
                 continue
             elif root.key_is_renamed(full_key):
                 root.raise_key_rename_error(full_key)
             else:
                 raise KeyError("Non-existent config key: {}".format(full_key))
-
-        v = copy.deepcopy(v_)
-        v = _decode_cfg_value(v)
-        v = _check_and_coerce_cfg_value_type(v, b[k], k, full_key)
-
-        # Recursively merge dicts
-        if isinstance(v, CfgNode):
-            try:
-                _merge_a_into_b(v, b[k], root, key_list + [k])
-            except BaseException:
-                raise
-        else:
-            b[k] = v
 
 
 def _decode_cfg_value(v):
