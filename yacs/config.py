@@ -388,28 +388,29 @@ def _merge_a_into_b(a, b, root, key_list):
 
     for k, v_ in a.items():
         full_key = ".".join(key_list + [k])
-        # a must specify keys that are in b
-        if k not in b and not b.is_new_allowed():
+
+        v = copy.deepcopy(v_)
+        v = _decode_cfg_value(v)
+
+        if k in b:
+            v = _check_and_coerce_cfg_value_type(v, b[k], k, full_key)
+            # Recursively merge dicts
+            if isinstance(v, CfgNode):
+                try:
+                    _merge_a_into_b(v, b[k], root, key_list + [k])
+                except BaseException:
+                    raise
+            else:
+                b[k] = v
+        elif b.is_new_allowed():
+            b[k] = v
+        else:
             if root.key_is_deprecated(full_key):
                 continue
             elif root.key_is_renamed(full_key):
                 root.raise_key_rename_error(full_key)
             else:
                 raise KeyError("Non-existent config key: {}".format(full_key))
-
-        v = copy.deepcopy(v_)
-        v = _decode_cfg_value(v)
-        if k in b:
-            v = _check_and_coerce_cfg_value_type(v, b[k], k, full_key)
-
-        # Recursively merge dicts
-        if isinstance(v, CfgNode) and not (k not in b and b.is_new_allowed()):
-            try:
-                _merge_a_into_b(v, b[k], root, key_list + [k])
-            except BaseException:
-                raise
-        else:
-            b[k] = v
 
 
 def _decode_cfg_value(v):
