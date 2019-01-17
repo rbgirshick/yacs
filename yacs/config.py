@@ -162,10 +162,10 @@ class CfgNode(dict):
     def __repr__(self):
         return "{}({})".format(self.__class__.__name__, super(CfgNode, self).__repr__())
 
-    def dump(self):
+    def dump(self, **kwargs):
         """Dump to a string."""
         self_as_dict = _to_dict(self)
-        return yaml.safe_dump(self_as_dict)
+        return yaml.safe_dump(self_as_dict, **kwargs)
 
     def merge_from_file(self, cfg_filename):
         """Load a yaml config file and merge it this CfgNode."""
