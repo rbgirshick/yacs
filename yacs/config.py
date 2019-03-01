@@ -21,6 +21,7 @@ See README.md for usage and examples.
 """
 
 import copy
+import sys
 import io
 import logging
 import os
@@ -30,7 +31,7 @@ import yaml
 
 # Flag for py2 and py3 compatibility to use when separate code paths are necessary
 # When _PY2 is False, we assume Python 3 is in use
-_PY2 = False
+_PY2 = sys.version_info.major == 2
 
 # Filename extensions for loading configs from files
 _YAML_EXTS = {"", ".yaml", ".yml"}
@@ -38,10 +39,9 @@ _PY_EXTS = {".py"}
 
 # py2 and py3 compatibility for checking file object type
 # We simply use this to infer py2 vs py3
-try:
+if _PY2:
     _FILE_TYPES = (file, io.IOBase)
-    _PY2 = True
-except NameError:
+else:
     _FILE_TYPES = (io.IOBase,)
 
 # CfgNodes can only contain a limited set of valid types
@@ -72,6 +72,14 @@ class CfgNode(dict):
     NEW_ALLOWED = "__new_allowed__"
 
     def __init__(self, init_dict=None, key_list=None, new_allowed=False):
+        """
+        Args:
+            init_dict (dict): the possibly-nested dictionary to initailize the CfgNode.
+            key_list (list[str]): a list of names which index this CfgNode from the root.
+                Currently only used for logging purposes.
+            new_allowed (bool): whether adding new key is allowed when merging with
+                other configs.
+        """
         # Recursively convert nested dictionaries in init_dict into CfgNodes
         init_dict = {} if init_dict is None else init_dict
         key_list = [] if key_list is None else key_list
@@ -164,7 +172,23 @@ class CfgNode(dict):
 
     def dump(self, **kwargs):
         """Dump to a string."""
-        self_as_dict = _to_dict(self)
+
+        def convert_to_dict(cfg_node, key_list):
+            if not isinstance(cfg_node, CfgNode):
+                _assert_with_logging(
+                    _valid_type(cfg_node),
+                    "Key {} with value {} is not a valid type; valid types: {}".format(
+                        ".".join(key_list), type(cfg_node), _VALID_TYPES
+                    ),
+                )
+                return cfg_node
+            else:
+                cfg_dict = dict(cfg_node)
+                for k, v in cfg_dict.items():
+                    cfg_dict[k] = convert_to_dict(v, key_list + [k])
+                return cfg_dict
+
+        self_as_dict = convert_to_dict(self, [])
         return yaml.safe_dump(self_as_dict, **kwargs)
 
     def merge_from_file(self, cfg_filename):
@@ -348,29 +372,8 @@ def _load_cfg_py_source(filename):
         return module.cfg
 
 
-def _to_dict(cfg_node):
-    """Recursively convert all CfgNode objects to dict objects."""
-
-    def convert_to_dict(cfg_node, key_list):
-        if not isinstance(cfg_node, CfgNode):
-            _assert_with_logging(
-                _valid_type(cfg_node),
-                "Key {} with value {} is not a valid type; valid types: {}".format(
-                    ".".join(key_list), type(cfg_node), _VALID_TYPES
-                ),
-            )
-            return cfg_node
-        else:
-            cfg_dict = dict(cfg_node)
-            for k, v in cfg_dict.items():
-                cfg_dict[k] = convert_to_dict(v, key_list + [k])
-            return cfg_dict
-
-    return convert_to_dict(cfg_node, [])
-
-
 def _valid_type(value, allow_cfg_node=False):
-    return (type(value) in _VALID_TYPES) or (allow_cfg_node and type(value) == CfgNode)
+    return (type(value) in _VALID_TYPES) or (allow_cfg_node and isinstance(value, CfgNode))
 
 
 def _merge_a_into_b(a, b, root, key_list):
