@@ -12,26 +12,30 @@ except Exception as _ignore:
     PY2 = False
 
 
-def get_cfg():
-    cfg = CN()
+class SubCN(CN):
+    pass
+
+
+def get_cfg(cls=CN):
+    cfg = cls()
 
     cfg.NUM_GPUS = 8
 
-    cfg.TRAIN = CN()
+    cfg.TRAIN = cls()
     cfg.TRAIN.HYPERPARAMETER_1 = 0.1
     cfg.TRAIN.SCALES = (2, 4, 8, 16)
 
-    cfg.MODEL = CN()
+    cfg.MODEL = cls()
     cfg.MODEL.TYPE = "a_foo_model"
 
     # Some extra stuff to test CfgNode.__str__
-    cfg.STR = CN()
+    cfg.STR = cls()
     cfg.STR.KEY1 = 1
     cfg.STR.KEY2 = 2
-    cfg.STR.FOO = CN()
+    cfg.STR.FOO = cls()
     cfg.STR.FOO.KEY1 = 1
     cfg.STR.FOO.KEY2 = 2
-    cfg.STR.FOO.BAR = CN()
+    cfg.STR.FOO.BAR = cls()
     cfg.STR.FOO.BAR.KEY1 = 1
     cfg.STR.FOO.BAR.KEY2 = 2
 
@@ -44,9 +48,9 @@ def get_cfg():
         message="Please update your config fil config file.",
     )
 
-    cfg.KWARGS = CN(new_allowed=True)
+    cfg.KWARGS = cls(new_allowed=True)
     cfg.KWARGS.z = 0
-    cfg.KWARGS.Y = CN()
+    cfg.KWARGS.Y = cls()
     cfg.KWARGS.Y.X = 1
 
     return cfg
@@ -100,7 +104,7 @@ class TestCfg(unittest.TestCase):
 
         # Test: merge from yaml
         s = "dummy1"
-        cfg2 = yacs.config.load_cfg(cfg.dump())
+        cfg2 = CN.load_cfg(cfg.dump())
         cfg2.MODEL.TYPE = s
         cfg.merge_from_other_cfg(cfg2)
         assert cfg.MODEL.TYPE == s
@@ -293,6 +297,48 @@ TRAIN:
         cfg = get_cfg()
         with self.assertRaises(KeyError):
             cfg.merge_from_file("example/config_new_allowed_bad.yaml")
+
+
+class TestCfgNodeSubclass(unittest.TestCase):
+    def test_merge_cfg_from_file(self):
+        with tempfile.NamedTemporaryFile(mode="wt") as f:
+            cfg = get_cfg(SubCN)
+            f.write(cfg.dump())
+            f.flush()
+            s = cfg.MODEL.TYPE
+            cfg.MODEL.TYPE = "dummy"
+            assert cfg.MODEL.TYPE != s
+            cfg.merge_from_file(f.name)
+            assert cfg.MODEL.TYPE == s
+
+    def test_merge_cfg_from_list(self):
+        cfg = get_cfg(SubCN)
+        opts = ["TRAIN.SCALES", "(100, )", "MODEL.TYPE", "foobar", "NUM_GPUS", 2]
+        assert len(cfg.TRAIN.SCALES) > 0
+        assert cfg.TRAIN.SCALES[0] != 100
+        assert cfg.MODEL.TYPE != "foobar"
+        assert cfg.NUM_GPUS != 2
+        cfg.merge_from_list(opts)
+        assert type(cfg.TRAIN.SCALES) is tuple
+        assert len(cfg.TRAIN.SCALES) == 1
+        assert cfg.TRAIN.SCALES[0] == 100
+        assert cfg.MODEL.TYPE == "foobar"
+        assert cfg.NUM_GPUS == 2
+
+    def test_merge_cfg_from_cfg(self):
+        cfg = get_cfg(SubCN)
+        cfg2 = get_cfg(SubCN)
+        s = "dummy0"
+        cfg2.MODEL.TYPE = s
+        cfg.merge_from_other_cfg(cfg2)
+        assert cfg.MODEL.TYPE == s
+
+        # Test: merge from yaml
+        s = "dummy1"
+        cfg2 = SubCN.load_cfg(cfg.dump())
+        cfg2.MODEL.TYPE = s
+        cfg.merge_from_other_cfg(cfg2)
+        assert cfg.MODEL.TYPE == s
 
 
 if __name__ == "__main__":
