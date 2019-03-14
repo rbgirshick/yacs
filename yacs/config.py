@@ -45,7 +45,7 @@ else:
     _FILE_TYPES = (io.IOBase,)
 
 # CfgNodes can only contain a limited set of valid types
-_VALID_TYPES = {tuple, list, str, int, float, bool}
+_VALID_TYPES = {tuple, list, str, int, float, bool, type(None)}
 # py2 allow for str and unicode
 if _PY2:
     _VALID_TYPES = _VALID_TYPES.union({unicode})  # noqa: F821
