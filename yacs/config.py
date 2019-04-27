@@ -21,10 +21,10 @@ See README.md for usage and examples.
 """
 
 import copy
-import sys
 import io
 import logging
 import os
+import sys
 from ast import literal_eval
 
 import yaml
@@ -426,11 +426,15 @@ class CfgNode(dict):
         return value
 
 
-load_cfg = CfgNode.load_cfg   # keep this function in global scope for backward compatibility
+load_cfg = (
+    CfgNode.load_cfg
+)  # keep this function in global scope for backward compatibility
 
 
 def _valid_type(value, allow_cfg_node=False):
-    return (type(value) in _VALID_TYPES) or (allow_cfg_node and isinstance(value, CfgNode))
+    return (type(value) in _VALID_TYPES) or (
+        allow_cfg_node and isinstance(value, CfgNode)
+    )
 
 
 def _merge_a_into_b(a, b, root, key_list):
