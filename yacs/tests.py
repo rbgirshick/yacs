@@ -297,7 +297,7 @@ TRAIN:
         cfg.merge_from_file("example/config_new_allowed.yaml")
         assert cfg.KWARGS.a == 1
         assert cfg.KWARGS.B.c == 2
-        assert cfg.KWARGS.B.D.e == '3'
+        assert cfg.KWARGS.B.D.e == "3"
 
     def test_new_allowed_bad(self):
         cfg = get_cfg()
