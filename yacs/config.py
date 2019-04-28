@@ -490,8 +490,9 @@ def _check_and_coerce_cfg_value_type(replacement, original, key, full_key):
         return replacement
 
     # If either of them is None, allow type conversion to one of the valid types
-    if (replacement_type == type(None) and original_type in _VALID_TYPES) \
-            or (original_type == type(None) and replacement_type in _VALID_TYPES):
+    if (replacement_type == type(None) and original_type in _VALID_TYPES) or (
+        original_type == type(None) and replacement_type in _VALID_TYPES
+    ):
         return replacement
 
     # Cast replacement from from_type to to_type if the replacement and original
