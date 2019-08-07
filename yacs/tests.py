@@ -88,6 +88,19 @@ class TestCfgNode(unittest.TestCase):
             a.level1.bar = 1
         assert a.level1.level2.foo == 0
 
+    def test_freeze_With_required_params(self):
+        cfg1 = CN()
+        cfg1.foo = Required(int)
+        with self.assertRaises(AssertionError):
+            cfg1.freeze()
+
+        cfg2 = CN()
+        cfg2.foo = CN()
+        cfg2.foo.bar = Required(str)
+
+        with self.assertRaises(AssertionError):
+            cfg2.freeze()
+
 
 class TestCfg(unittest.TestCase):
     def test_copy_cfg(self):

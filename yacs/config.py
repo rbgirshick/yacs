@@ -272,6 +272,10 @@ class CfgNode(dict):
 
     def freeze(self):
         """Make this CfgNode and all of its children immutable."""
+        _assert_with_logging(
+            not self._has_required_params(),
+            "Config has unset required parameters."
+        )
         self._immutable(True)
 
     def defrost(self):
@@ -294,6 +298,15 @@ class CfgNode(dict):
         for v in self.values():
             if isinstance(v, CfgNode):
                 v._immutable(is_immutable)
+
+    def _has_required_params(self):
+        for k, v in self.items():
+            if isinstance(v, CfgNode):
+                if v._has_required_params():
+                    return True
+            if isinstance(v, Required):
+                return True
+        return False
 
     def clone(self):
         """Recursively copy this CfgNode."""
