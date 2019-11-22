@@ -92,7 +92,7 @@ the `cfg` can be copied and passed as an argument.
 # my_project/main.py
 
 import my_project
-from config import get_cfg  # local variable usage pattern, or:
+from config import get_cfg_defaults  # local variable usage pattern, or:
 # from config import cfg  # global singleton usage pattern
 
 
