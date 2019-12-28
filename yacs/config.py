@@ -499,7 +499,7 @@ def _check_and_coerce_cfg_value_type(replacement, original, key, full_key):
 
     # Conditionally casts
     # list <-> tuple
-    casts = [(tuple, list), (list, tuple)]
+    casts = [(tuple, list), (list, tuple), (int, str)]
     # For py2: allow converting from str (bytes) to a unicode string
     try:
         casts.append((str, unicode))  # noqa: F821
