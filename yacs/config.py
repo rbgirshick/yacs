@@ -388,7 +388,7 @@ class CfgNode(dict):
         return cls(module.cfg)
 
     @classmethod
-    def _decode_cfg_value(cls, value):
+    def _decode_cfg_value(cls, value, original_type):
         """
         Decodes a raw config value (e.g., from a yaml config files or command
         line argument) into a Python object.
@@ -404,6 +404,12 @@ class CfgNode(dict):
         # All remaining processing is only applied to strings
         if not isinstance(value, str):
             return value
+        
+        # if the type of new value is same as the original type, do not literal eval
+        # this is to avoid conversions such as "+12345" to 12345 (phone number strings)
+        if isinstance(value, original_type):
+            return value
+
         # Try to interpret `value` as a:
         #   string, number, tuple, list, dict, boolean, or None
         try:
@@ -454,7 +460,7 @@ def _merge_a_into_b(a, b, root, key_list):
         full_key = ".".join(key_list + [k])
 
         v = copy.deepcopy(v_)
-        v = b._decode_cfg_value(v)
+        v = b._decode_cfg_value(v, type(b[k]))
 
         if k in b:
             v = _check_and_coerce_cfg_value_type(v, b[k], k, full_key)
@@ -466,6 +472,7 @@ def _merge_a_into_b(a, b, root, key_list):
                     raise
             else:
                 b[k] = v
+
         elif b.is_new_allowed():
             b[k] = v
         else:
