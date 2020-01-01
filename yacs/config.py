@@ -241,7 +241,7 @@ class CfgNode(dict):
                 d = d[subkey]
             subkey = key_list[-1]
             _assert_with_logging(subkey in d, "Non-existent key: {}".format(full_key))
-            value = self._decode_cfg_value(v)
+            value = self._decode_cfg_value(v, type(d[subkey]))
             value = _check_and_coerce_cfg_value_type(value, d[subkey], subkey, full_key)
             d[subkey] = value
 
@@ -388,7 +388,7 @@ class CfgNode(dict):
         return cls(module.cfg)
 
     @classmethod
-    def _decode_cfg_value(cls, value, original_type):
+    def _decode_cfg_value(cls, value, original_type=None):
         """
         Decodes a raw config value (e.g., from a yaml config files or command
         line argument) into a Python object.
@@ -407,7 +407,7 @@ class CfgNode(dict):
         
         # if the type of new value is same as the original type, do not literal eval
         # this is to avoid conversions such as "+12345" to 12345 (phone number strings)
-        if isinstance(value, original_type):
+        if original_type is not None and isinstance(value, original_type):
             return value
 
         # Try to interpret `value` as a:
@@ -460,7 +460,8 @@ def _merge_a_into_b(a, b, root, key_list):
         full_key = ".".join(key_list + [k])
 
         v = copy.deepcopy(v_)
-        v = b._decode_cfg_value(v, type(b[k]))
+        original_type = type(b[k]) if k in b else None
+        v = b._decode_cfg_value(v, original_type)
 
         if k in b:
             v = _check_and_coerce_cfg_value_type(v, b[k], k, full_key)
