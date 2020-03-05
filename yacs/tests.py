@@ -3,6 +3,8 @@ import tempfile
 import unittest
 from datetime import date, datetime
 
+import yaml
+
 import yacs.config
 from yacs.config import CfgNode as CN
 
@@ -195,6 +197,17 @@ class TestCfg(unittest.TestCase):
         opts = ["MODEL.DOES_NOT_EXIST", "IGNORE"]
         with self.assertRaises(AssertionError):
             cfg.merge_from_list(opts)
+
+    def test_load_cfg_invalid_type(self):
+        class CustomClass(yaml.YAMLObject):
+            """A custom class that yaml.safe_load can load."""
+            yaml_loader = yaml.SafeLoader
+            yaml_tag = u'!CustomClass'
+
+        # FOO.BAR.QUUX will have type CustomClass, which is not allowed
+        cfg_string = "FOO:\n BAR:\n  QUUX: !CustomClass {}"
+        with self.assertRaises(AssertionError):
+            yacs.config.load_cfg(cfg_string)
 
     def test_deprecated_key_from_file(self):
         # You should see logger messages like:
