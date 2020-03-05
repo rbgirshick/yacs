@@ -21,6 +21,7 @@ See README.md for usage and examples.
 """
 
 import copy
+import datetime
 import io
 import logging
 import os
@@ -45,10 +46,13 @@ else:
     _FILE_TYPES = (io.IOBase,)
 
 # CfgNodes can only contain a limited set of valid types
-_VALID_TYPES = {tuple, list, str, int, float, bool}
-# py2 allow for str and unicode
+_VALID_TYPES = {tuple, list, str, int, float, bool, datetime.date, datetime.datetime, set, type(None)}
+# py2 allow for unicode and long
 if _PY2:
-    _VALID_TYPES = _VALID_TYPES.union({unicode})  # noqa: F821
+    _VALID_TYPES = _VALID_TYPES.union({unicode, long})  # noqa: F821
+# py3 allow for bytes (py2 str)
+else:
+    _VALID_TYPES = _VALID_TYPES.union({bytes})
 
 # Utilities for importing modules from file paths
 if _PY2:
@@ -482,6 +486,9 @@ def _check_and_coerce_cfg_value_type(replacement, original, key, full_key):
     the right type. The type is correct if it matches exactly or is one of a few
     cases in which the type can be easily coerced.
     """
+    if original is None or replacement is None:
+        return replacement
+
     original_type = type(original)
     replacement_type = type(replacement)
 

@@ -1,6 +1,9 @@
 import logging
 import tempfile
 import unittest
+from datetime import date, datetime
+
+import yaml
 
 import yacs.config
 from yacs.config import CfgNode as CN
@@ -196,8 +199,13 @@ class TestCfg(unittest.TestCase):
             cfg.merge_from_list(opts)
 
     def test_load_cfg_invalid_type(self):
-        # FOO.BAR.QUUX will have type None, which is not allowed
-        cfg_string = "FOO:\n BAR:\n  QUUX:"
+        class CustomClass(yaml.YAMLObject):
+            """A custom class that yaml.safe_load can load."""
+            yaml_loader = yaml.SafeLoader
+            yaml_tag = u'!CustomClass'
+
+        # FOO.BAR.QUUX will have type CustomClass, which is not allowed
+        cfg_string = "FOO:\n BAR:\n  QUUX: !CustomClass {}"
         with self.assertRaises(AssertionError):
             yacs.config.load_cfg(cfg_string)
 
@@ -297,6 +305,23 @@ TRAIN:
         cfg = get_cfg()
         with self.assertRaises(KeyError):
             cfg.merge_from_file("example/config_new_allowed_bad.yaml")
+
+    def test_all_types(self):
+        cfg = CN()
+        cfg.NONE = None
+        cfg.BOOL = False
+        cfg.INT = 0
+        cfg.FLOAT = 2.72
+        cfg.BINARY = b"binary"
+        cfg.DATE = date(2020, 1, 1)
+        cfg.DATETIME = datetime(2020, 1, 1, 0, 0, 1)
+        cfg.PAIRS = [("zero", 0)]
+        cfg.SET = {1, }
+        cfg.STRING = "string"
+        cfg.STR_NONE = None
+        cfg.NONE_STR = "string"
+
+        cfg.merge_from_file("example/config_types.yaml")
 
 
 class TestCfgNodeSubclass(unittest.TestCase):
