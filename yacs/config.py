@@ -436,7 +436,7 @@ load_cfg = (
 
 def _valid_type(value, allow_cfg_node=False):
     return (type(value) in _VALID_TYPES) or (
-            allow_cfg_node and isinstance(value, CfgNode)
+        allow_cfg_node and isinstance(value, CfgNode)
     )
 
 

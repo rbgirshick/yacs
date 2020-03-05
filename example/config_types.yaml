@@ -1,0 +1,14 @@
+NONE: null
+BOOL: True
+INT: 42
+FLOAT: 3.14
+BINARY: !!binary YmluYXJ5
+DATE: 2020-03-05
+DATETIME: 2020-03-05T13:07:56Z
+PAIRS: !!pairs [ one: 1, two: 2 ]
+SET: !!set {1,2,3}
+STRING: hello
+# Check None overwrite
+STR_NONE: hello
+# Check overwrite by None
+NONE_STR: null
