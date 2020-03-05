@@ -47,9 +47,10 @@ else:
 
 # CfgNodes can only contain a limited set of valid types
 _VALID_TYPES = {tuple, list, str, int, float, bool, datetime.date, datetime.datetime, set, type(None)}
-# py2 allow for str, unicode and long
+# py2 allow for unicode and long
 if _PY2:
     _VALID_TYPES = _VALID_TYPES.union({unicode, long})  # noqa: F821
+# py3 allow for bytes (py2 str)
 else:
     _VALID_TYPES = _VALID_TYPES.union({bytes})
 
