@@ -1,6 +1,7 @@
 import logging
 import tempfile
 import unittest
+from datetime import date, datetime
 
 import yacs.config
 from yacs.config import CfgNode as CN
@@ -195,12 +196,6 @@ class TestCfg(unittest.TestCase):
         with self.assertRaises(AssertionError):
             cfg.merge_from_list(opts)
 
-    def test_load_cfg_invalid_type(self):
-        # FOO.BAR.QUUX will have type None, which is not allowed
-        cfg_string = "FOO:\n BAR:\n  QUUX:"
-        with self.assertRaises(AssertionError):
-            yacs.config.load_cfg(cfg_string)
-
     def test_deprecated_key_from_file(self):
         # You should see logger messages like:
         #   "Deprecated config key (ignoring): MODEL.DILATION"
@@ -297,6 +292,23 @@ TRAIN:
         cfg = get_cfg()
         with self.assertRaises(KeyError):
             cfg.merge_from_file("example/config_new_allowed_bad.yaml")
+
+    def test_all_types(self):
+        cfg = CN()
+        cfg.NONE = None
+        cfg.BOOL = False
+        cfg.INT = 0
+        cfg.FLOAT = 2.72
+        cfg.BINARY = b"binary"
+        cfg.DATE = date(2020, 1, 1)
+        cfg.DATETIME = datetime(2020, 1, 1, 0, 0, 1)
+        cfg.PAIRS = [("zero", 0)]
+        cfg.SET = {1, }
+        cfg.STRING = "string"
+        cfg.STR_NONE = None
+        cfg.NONE_STR = "string"
+
+        cfg.merge_from_file("example/config_types.yaml")
 
 
 class TestCfgNodeSubclass(unittest.TestCase):
