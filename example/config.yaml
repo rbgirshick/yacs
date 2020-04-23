@@ -2,3 +2,7 @@ SYSTEM:
   NUM_GPUS: 2
 TRAIN:
   SCALES: (1, 2)
+DATASETS:
+  train_2017:
+    17: 1
+    18: 1

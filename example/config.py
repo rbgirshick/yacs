@@ -10,4 +10,6 @@ _C.TRAIN = CN()
 _C.TRAIN.HYPERPARAMETER_1 = 0.1
 _C.TRAIN.SCALES = (2, 4, 8, 16)
 
+_C.DATASETS = CN(new_allowed=True)
+
 cfg = _C
