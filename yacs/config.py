@@ -129,7 +129,7 @@ class CfgNode(dict):
                 _assert_with_logging(
                     _valid_type(v, allow_cfg_node=False),
                     "Key {} with value {} is not a valid type; valid types: {}".format(
-                        ".".join(key_list + [k]), type(v), _VALID_TYPES
+                        ".".join(key_list + [str(k)]), type(v), _VALID_TYPES
                     ),
                 )
         return dic
