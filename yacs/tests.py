@@ -4,6 +4,7 @@ import unittest
 
 import yacs.config
 from yacs.config import CfgNode as CN
+from yacs.params import Parameter, Required
 
 try:
     _ignore = unicode  # noqa: F821
@@ -21,8 +22,11 @@ def get_cfg(cls=CN):
 
     cfg.NUM_GPUS = 8
 
+    # required keys
+    cfg.REQUIRED_FLOAT = Required(float, description="a required float parameter")
+
     cfg.TRAIN = cls()
-    cfg.TRAIN.HYPERPARAMETER_1 = 0.1
+    cfg.TRAIN.HYPERPARAMETER_1 = Parameter(0.1, description='hyperparameter 1')
     cfg.TRAIN.SCALES = (2, 4, 8, 16)
 
     cfg.MODEL = cls()
@@ -84,6 +88,19 @@ class TestCfgNode(unittest.TestCase):
             a.level1.bar = 1
         assert a.level1.level2.foo == 0
 
+    def test_freeze_With_required_params(self):
+        cfg1 = CN()
+        cfg1.foo = Required(int)
+        with self.assertRaises(AssertionError):
+            cfg1.freeze()
+
+        cfg2 = CN()
+        cfg2.foo = CN()
+        cfg2.foo.bar = Required(str)
+
+        with self.assertRaises(AssertionError):
+            cfg2.freeze()
+
 
 class TestCfg(unittest.TestCase):
     def test_copy_cfg(self):
@@ -96,6 +113,8 @@ class TestCfg(unittest.TestCase):
     def test_merge_cfg_from_cfg(self):
         # Test: merge from clone
         cfg = get_cfg()
+        cfg.REQUIRED_FLOAT = 1.0
+
         s = "dummy0"
         cfg2 = cfg.clone()
         cfg2.MODEL.TYPE = s
@@ -133,6 +152,13 @@ class TestCfg(unittest.TestCase):
         assert type(cfg.TRAIN.SCALES) is tuple
         assert cfg.TRAIN.SCALES[0] == 1
 
+        # Test: merge with required key
+        cfg1 = get_cfg()
+        cfg2 = CN()
+        cfg2.REQUIRED_FLOAT = 1.0
+        cfg1.merge_from_other_cfg(cfg2)
+        assert cfg1.REQUIRED_FLOAT == 1.0
+
         # Test str (bytes) <-> unicode conversion for py2
         if PY2:
             cfg.A_UNICODE_KEY = u"foo"
@@ -152,6 +178,8 @@ class TestCfg(unittest.TestCase):
     def test_merge_cfg_from_file(self):
         with tempfile.NamedTemporaryFile(mode="wt") as f:
             cfg = get_cfg()
+            cfg.REQUIRED_FLOAT = 1.0
+
             f.write(cfg.dump())
             f.flush()
             s = cfg.MODEL.TYPE
@@ -205,6 +233,8 @@ class TestCfg(unittest.TestCase):
         # You should see logger messages like:
         #   "Deprecated config key (ignoring): MODEL.DILATION"
         cfg = get_cfg()
+        cfg.REQUIRED_FLOAT = 1.0
+
         with tempfile.NamedTemporaryFile("wt") as f:
             cfg2 = cfg.clone()
             cfg2.MODEL.DILATION = 2
@@ -226,6 +256,8 @@ class TestCfg(unittest.TestCase):
 
     def test_renamed_key_from_file(self):
         cfg = get_cfg()
+        cfg.REQUIRED_FLOAT = 1.0
+
         with tempfile.NamedTemporaryFile("wt") as f:
             cfg2 = cfg.clone()
             cfg2.EXAMPLE = CN()
@@ -240,6 +272,8 @@ class TestCfg(unittest.TestCase):
 
     def test_load_cfg_from_file(self):
         cfg = get_cfg()
+        cfg.REQUIRED_FLOAT = 1.0
+
         with tempfile.NamedTemporaryFile("wt") as f:
             f.write(cfg.dump())
             f.flush()
@@ -270,6 +304,7 @@ KWARGS:
 MODEL:
   TYPE: a_foo_model
 NUM_GPUS: 8
+REQUIRED_FLOAT: required(float)		[a required float parameter]
 STR:
   FOO:
     BAR:
@@ -280,7 +315,7 @@ STR:
   KEY1: 1
   KEY2: 2
 TRAIN:
-  HYPERPARAMETER_1: 0.1
+  HYPERPARAMETER_1: 0.1		[hyperparameter 1]
   SCALES: (2, 4, 8, 16)
 """.strip()
         cfg = get_cfg()
@@ -298,11 +333,18 @@ TRAIN:
         with self.assertRaises(KeyError):
             cfg.merge_from_file("example/config_new_allowed_bad.yaml")
 
+    def test_invalid_overload(self):
+        cfg = get_cfg()
+        with self.assertRaises(AssertionError):
+            cfg.REQUIRED_FLOAT = 1
+
 
 class TestCfgNodeSubclass(unittest.TestCase):
     def test_merge_cfg_from_file(self):
         with tempfile.NamedTemporaryFile(mode="wt") as f:
             cfg = get_cfg(SubCN)
+            cfg.REQUIRED_FLOAT = 1.0
+
             f.write(cfg.dump())
             f.flush()
             s = cfg.MODEL.TYPE
@@ -327,7 +369,11 @@ class TestCfgNodeSubclass(unittest.TestCase):
 
     def test_merge_cfg_from_cfg(self):
         cfg = get_cfg(SubCN)
+        cfg.REQUIRED_FLOAT = 1.0
+
         cfg2 = get_cfg(SubCN)
+        cfg2.REQUIRED_FLOAT = 1.0
+
         s = "dummy0"
         cfg2.MODEL.TYPE = s
         cfg.merge_from_other_cfg(cfg2)

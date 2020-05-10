@@ -21,34 +21,15 @@ See README.md for usage and examples.
 """
 
 import copy
-import io
 import logging
 import os
-import sys
 from ast import literal_eval
+from collections import defaultdict
 
 import yaml
 
-# Flag for py2 and py3 compatibility to use when separate code paths are necessary
-# When _PY2 is False, we assume Python 3 is in use
-_PY2 = sys.version_info.major == 2
-
-# Filename extensions for loading configs from files
-_YAML_EXTS = {"", ".yaml", ".yml"}
-_PY_EXTS = {".py"}
-
-# py2 and py3 compatibility for checking file object type
-# We simply use this to infer py2 vs py3
-if _PY2:
-    _FILE_TYPES = (file, io.IOBase)
-else:
-    _FILE_TYPES = (io.IOBase,)
-
-# CfgNodes can only contain a limited set of valid types
-_VALID_TYPES = {tuple, list, str, int, float, bool}
-# py2 allow for str and unicode
-if _PY2:
-    _VALID_TYPES = _VALID_TYPES.union({unicode})  # noqa: F821
+from yacs import _PY2, _PY_EXTS, _VALID_TYPES, _FILE_TYPES, _YAML_EXTS
+from yacs.params import Parameter, Required
 
 # Utilities for importing modules from file paths
 if _PY2:
@@ -56,6 +37,7 @@ if _PY2:
     import imp
 else:
     import importlib.util
+
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +52,7 @@ class CfgNode(dict):
     DEPRECATED_KEYS = "__deprecated_keys__"
     RENAMED_KEYS = "__renamed_keys__"
     NEW_ALLOWED = "__new_allowed__"
+    HELP = "__help__"
 
     def __init__(self, init_dict=None, key_list=None, new_allowed=False):
         """
@@ -83,7 +66,7 @@ class CfgNode(dict):
         # Recursively convert nested dictionaries in init_dict into CfgNodes
         init_dict = {} if init_dict is None else init_dict
         key_list = [] if key_list is None else key_list
-        init_dict = self._create_config_tree_from_dict(init_dict, key_list)
+        init_dict, help_dict = self._create_config_tree_from_dict(init_dict, key_list)
         super(CfgNode, self).__init__(init_dict)
         # Manage if the CfgNode is frozen or not
         self.__dict__[CfgNode.IMMUTABLE] = False
@@ -107,6 +90,7 @@ class CfgNode(dict):
 
         # Allow new attributes after initialisation
         self.__dict__[CfgNode.NEW_ALLOWED] = new_allowed
+        self.__dict__[CfgNode.HELP] = help_dict
 
     @classmethod
     def _create_config_tree_from_dict(cls, dic, key_list):
@@ -120,19 +104,25 @@ class CfgNode(dict):
                 Currently only used for logging purposes.
         """
         dic = copy.deepcopy(dic)
+        help_dict = defaultdict(str)
+
         for k, v in dic.items():
+            # Check for valid leaf type or nested CfgNode
             if isinstance(v, dict):
                 # Convert dict to CfgNode
                 dic[k] = cls(v, key_list=key_list + [k])
             else:
-                # Check for valid leaf type or nested CfgNode
+                if isinstance(v, Parameter):
+                    v = v.value
+                    help_dict[k] = v.help
+
                 _assert_with_logging(
                     _valid_type(v, allow_cfg_node=False),
                     "Key {} with value {} is not a valid type; valid types: {}".format(
                         ".".join(key_list + [str(k)]), type(v), _VALID_TYPES
                     ),
                 )
-        return dic
+        return dic, help_dict
 
     def __getattr__(self, name):
         if name in self:
@@ -152,14 +142,38 @@ class CfgNode(dict):
             name not in self.__dict__,
             "Invalid attempt to modify internal CfgNode state: {}".format(name),
         )
-        _assert_with_logging(
-            _valid_type(value, allow_cfg_node=True),
-            "Invalid type {} for key {}; valid types = {}".format(
-                type(value), name, _VALID_TYPES
-            ),
-        )
 
-        self[name] = value
+        if isinstance(self.get(name), Required):
+            if isinstance(value, Parameter):
+                value_type = value.type
+            else:
+                value_type = type(value)
+
+            required_type = self.get(name).type
+            _assert_with_logging(
+                value_type == required_type,
+                "Invalid type {} for key {}; required type = {}".format(
+                    value_type, name, required_type
+                )
+            )
+
+        if isinstance(value, Parameter):
+            if not value.required:
+                self[name] = value.value
+            else:
+                self[name] = value
+
+            self.__dict__[CfgNode.HELP][name] = value.description
+
+        else:
+            _assert_with_logging(
+                _valid_type(value, allow_cfg_node=True),
+                "Invalid type {} for key {}; valid types = {}".format(
+                    type(value), name, _VALID_TYPES
+                ),
+            )
+
+            self[name] = value
 
     def __str__(self):
         def _indent(s_, num_spaces):
@@ -177,6 +191,9 @@ class CfgNode(dict):
         for k, v in sorted(self.items()):
             seperator = "\n" if isinstance(v, CfgNode) else " "
             attr_str = "{}:{}{}".format(str(k), seperator, str(v))
+            description = self.get_description(k)
+            if description:
+                attr_str += '\t\t[{}]'.format(description)
             attr_str = _indent(attr_str, 2)
             s.append(attr_str)
         r += "\n".join(s)
@@ -190,12 +207,20 @@ class CfgNode(dict):
 
         def convert_to_dict(cfg_node, key_list):
             if not isinstance(cfg_node, CfgNode):
-                _assert_with_logging(
-                    _valid_type(cfg_node),
-                    "Key {} with value {} is not a valid type; valid types: {}".format(
-                        ".".join(key_list), type(cfg_node), _VALID_TYPES
-                    ),
-                )
+                if isinstance(cfg_node, Parameter):
+                    _assert_with_logging(
+                        not cfg_node.required,
+                        "Key {} is required to be overloaded a parameter of type {}".format(
+                            ".".join(key_list), cfg_node.type.__name__
+                        )
+                    )
+                else:
+                    _assert_with_logging(
+                        _valid_type(cfg_node),
+                        "Key {} with value {} is not a valid type; valid types: {}".format(
+                            ".".join(key_list), type(cfg_node), _VALID_TYPES
+                        ),
+                    )
                 return cfg_node
             else:
                 cfg_dict = dict(cfg_node)
@@ -247,6 +272,10 @@ class CfgNode(dict):
 
     def freeze(self):
         """Make this CfgNode and all of its children immutable."""
+        _assert_with_logging(
+            not self._has_required_params(),
+            "Config has unset required parameters."
+        )
         self._immutable(True)
 
     def defrost(self):
@@ -269,6 +298,15 @@ class CfgNode(dict):
         for v in self.values():
             if isinstance(v, CfgNode):
                 v._immutable(is_immutable)
+
+    def _has_required_params(self):
+        for k, v in self.items():
+            if isinstance(v, CfgNode):
+                if v._has_required_params():
+                    return True
+            if isinstance(v, Required):
+                return True
+        return False
 
     def clone(self):
         """Recursively copy this CfgNode."""
@@ -425,6 +463,9 @@ class CfgNode(dict):
             pass
         return value
 
+    def get_description(self, key):
+        return self.__dict__[CfgNode.HELP][key]
+
 
 load_cfg = (
     CfgNode.load_cfg
@@ -432,6 +473,7 @@ load_cfg = (
 
 
 def _valid_type(value, allow_cfg_node=False):
+    value = value.value if isinstance(value, Parameter) else value
     return (type(value) in _VALID_TYPES) or (
         allow_cfg_node and isinstance(value, CfgNode)
     )
@@ -488,6 +530,14 @@ def _check_and_coerce_cfg_value_type(replacement, original, key, full_key):
     # The types must match (with some exceptions)
     if replacement_type == original_type:
         return replacement
+
+    if isinstance(original, Parameter):
+        if isinstance(replacement, Parameter):
+            if replacement.type == original.type:
+                return replacement
+        else:
+            if replacement_type == original.type:
+                return replacement
 
     # Cast replacement from from_type to to_type if the replacement and original
     # types match from_type and to_type
