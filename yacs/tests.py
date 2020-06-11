@@ -348,6 +348,12 @@ class TestCfgNodeSubclass(unittest.TestCase):
         assert cfg.MODEL.TYPE == s
 
 
+class TestMisc(unittest.TestCase):
+    def test_alias_import(self):
+        from yacs import CN
+        assert CN is not None
+
+
 if __name__ == "__main__":
     logging.basicConfig()
     yacs_logger = logging.getLogger("yacs.config")
