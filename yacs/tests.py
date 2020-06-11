@@ -3,6 +3,7 @@ import tempfile
 import unittest
 
 import yacs.config
+import yaml
 from yacs.config import CfgNode as CN
 
 try:
@@ -196,8 +197,14 @@ class TestCfg(unittest.TestCase):
             cfg.merge_from_list(opts)
 
     def test_load_cfg_invalid_type(self):
-        # FOO.BAR.QUUX will have type None, which is not allowed
-        cfg_string = "FOO:\n BAR:\n  QUUX:"
+        class CustomClass(yaml.YAMLObject):
+            """A custom class that yaml.safe_load can load."""
+
+            yaml_loader = yaml.SafeLoader
+            yaml_tag = u"!CustomClass"
+
+        # FOO.BAR.QUUX will have type CustomClass, which is not allowed
+        cfg_string = "FOO:\n BAR:\n  QUUX: !CustomClass {}"
         with self.assertRaises(AssertionError):
             yacs.config.load_cfg(cfg_string)
 
