@@ -325,6 +325,20 @@ class CfgNode(dict):
     def is_new_allowed(self):
         return self.__dict__[CfgNode.NEW_ALLOWED]
 
+    def set_new_allowed(self, is_new_allowed):
+        """
+        Set this config (and recursively its subconfigs) to allow merging
+        new keys from other configs.
+        """
+        self.__dict__[CfgNode.NEW_ALLOWED] = is_new_allowed
+        # Recursively set new_allowed state
+        for v in self.__dict__.values():
+            if isinstance(v, CfgNode):
+                v.set_new_allowed(is_new_allowed)
+        for v in self.values():
+            if isinstance(v, CfgNode):
+                v.set_new_allowed(is_new_allowed)
+
     @classmethod
     def load_cfg(cls, cfg_file_obj_or_str):
         """
