@@ -305,6 +305,10 @@ TRAIN:
         with self.assertRaises(KeyError):
             cfg.merge_from_file("example/config_new_allowed_bad.yaml")
 
+        cfg.set_new_allowed(True)
+        cfg.merge_from_file("example/config_new_allowed_bad.yaml")
+        assert cfg.KWARGS.Y.f == 4
+
 
 class TestCfgNodeSubclass(unittest.TestCase):
     def test_merge_cfg_from_file(self):
