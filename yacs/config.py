@@ -481,7 +481,14 @@ def _merge_a_into_b(a, b, root, key_list):
             else:
                 b[k] = v
         elif b.is_new_allowed():
-            b[k] = v
+            if isinstance(v, CfgNode):
+                b[k] = CfgNode(new_allowed=True)
+                try:
+                    _merge_a_into_b(v, b[k], root, key_list + [k])
+                except BaseException:
+                    raise
+            else:
+                b[k] = v
         else:
             if root.key_is_deprecated(full_key):
                 continue
