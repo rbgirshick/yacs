@@ -1,0 +1,7 @@
+KWARGS:
+  X:
+    a: 1e-3 # Test adding of 1e? type float value
+  Y:
+    b: [I, am, a, test]  # Test adding of a list of str
+    c:
+      d: [1, 3, 5, 7]  # Test adding of a list of integar
