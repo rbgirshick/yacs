@@ -257,10 +257,18 @@ class TestCfg(unittest.TestCase):
         # Test a change in config gives correct diff config
         cfg = get_cfg()
         cfg2 = cfg.clone()
+        cfg2.pop("NUM_GPUS")
         cfg2.MODEL.TYPE = "a_bar_model"
+        cfg2.TEST = "new_key"
         expected = CN()
-        expected.MODEL = CN()
-        expected.MODEL.TYPE = "a_bar_model"
+        expected["add"] = CN()
+        expected.add.TEST = "new_key"
+        expected["minus"] = CN()
+        expected.minus.NUM_GPUS = 8
+        expected["change"] = CN()
+        expected.change.MODEL = CN()
+        expected.change.MODEL.TYPE = "a_bar_model"
+        print(cfg.diff_from(cfg2))
         assert cfg.diff_from(cfg2) == expected
 
     def test_load_from_python_file(self):
