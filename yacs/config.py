@@ -200,7 +200,7 @@ class CfgNode(dict):
             else:
                 cfg_dict = dict(cfg_node)
                 for k, v in cfg_dict.items():
-                    cfg_dict[k] = convert_to_dict(v, key_list + [k])
+                    cfg_dict[k] = convert_to_dict(v, key_list + [str(k)])
                 return cfg_dict
 
         self_as_dict = convert_to_dict(self, [])
