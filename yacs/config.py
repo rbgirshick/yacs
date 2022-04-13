@@ -270,6 +270,29 @@ class CfgNode(dict):
             if isinstance(v, CfgNode):
                 v._immutable(is_immutable)
 
+    def diff_from(self, other):
+        out = CfgNode()
+        out["add"] = CfgNode()
+        out["minus"] = CfgNode()
+        out["change"] = CfgNode()
+
+        return self._diff_from(other, out)
+
+    def _diff_from(self, other, out):
+        for key in self.keys():
+            if key not in other.keys():
+                out.minus[key] = self[key]
+        for key in other.keys():
+            if key not in self.keys():
+                out.add[key] = other[key]
+            elif self[key] != other[key]:
+                if isinstance(other[key], CfgNode):
+                    out.change[key] = CfgNode()
+                    out.change[key] = self[key]._diff_from(other[key], out.change[key])
+                else:
+                    out[key] = other[key]
+        return out
+
     def clone(self):
         """Recursively copy this CfgNode."""
         return copy.deepcopy(self)
