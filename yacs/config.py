@@ -463,7 +463,7 @@ load_cfg = (
 
 def _valid_type(value, allow_cfg_node=False):
     return (type(value) in _VALID_TYPES) or (
-            allow_cfg_node and isinstance(value, CfgNode)
+        allow_cfg_node and isinstance(value, CfgNode)
     )
 
 
@@ -521,7 +521,7 @@ def _check_and_coerce_cfg_value_type(replacement, original, key, full_key):
 
     # If either of them is None, allow type conversion to one of the valid types
     if (replacement_type == type(None) and original_type in _VALID_TYPES) or (
-            original_type == type(None) and replacement_type in _VALID_TYPES
+        original_type == type(None) and replacement_type in _VALID_TYPES
     ):
         return replacement
 
