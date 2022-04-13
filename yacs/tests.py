@@ -253,6 +253,16 @@ class TestCfg(unittest.TestCase):
             with open(f.name, "rt") as f_read:
                 yacs.config.load_cfg(f_read)
 
+    def test_diff_cfg(self):
+        # Test a change in config gives correct diff config
+        cfg = get_cfg()
+        cfg2 = cfg.clone()
+        cfg2.MODEL.TYPE = "a_bar_model"
+        expected = CN()
+        expected.MODEL = CN()
+        expected.MODEL.TYPE = "a_bar_model"
+        assert cfg.diff_from(cfg2) == expected
+
     def test_load_from_python_file(self):
         # Case 1: exports CfgNode
         cfg = get_cfg()
