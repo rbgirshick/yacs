@@ -413,6 +413,8 @@ class CfgNode(dict):
         """
         # Configs parsed from raw yaml will contain dictionary keys that need to be
         # converted to CfgNode objects
+        if isinstance(value, CfgNode):
+            return value
         if isinstance(value, dict):
             return cls(value)
         # All remaining processing is only applied to strings
@@ -501,6 +503,17 @@ def _check_and_coerce_cfg_value_type(replacement, original, key, full_key):
 
     # The types must match (with some exceptions)
     if replacement_type == original_type:
+        return replacement
+
+    # Allow merging between CfgNode and its subclasses when one is a subclass of the other
+    if (
+        isinstance(original, CfgNode)
+        and isinstance(replacement, CfgNode)
+        and (
+            issubclass(original_type, replacement_type)
+            or issubclass(replacement_type, original_type)
+        )
+    ):
         return replacement
 
     # If either of them is None, allow type conversion to one of the valid types
