@@ -214,12 +214,16 @@ class CfgNode(dict):
 
     def merge_from_other_cfg(self, cfg_other):
         """Merge `cfg_other` into this CfgNode."""
+        if self.is_frozen():
+            raise AttributeError("Attempted to merge into immutable CfgNode")
         _merge_a_into_b(cfg_other, self, self, [])
 
     def merge_from_list(self, cfg_list):
         """Merge config (keys, values) in a list (e.g., from command line) into
         this CfgNode. For example, `cfg_list = ['FOO.BAR', 0.5]`.
         """
+        if self.is_frozen():
+            raise AttributeError("Attempted to merge into immutable CfgNode")
         _assert_with_logging(
             len(cfg_list) % 2 == 0,
             "Override list has odd length: {}; it must be a list of pairs".format(
@@ -243,6 +247,12 @@ class CfgNode(dict):
             _assert_with_logging(subkey in d, "Non-existent key: {}".format(full_key))
             value = self._decode_cfg_value(v)
             value = _check_and_coerce_cfg_value_type(value, d[subkey], subkey, full_key)
+            if d.is_frozen():
+                raise AttributeError(
+                    "Attempted to set {} to {}, but CfgNode is immutable".format(
+                        full_key, value
+                    )
+                )
             d[subkey] = value
 
     def freeze(self):
@@ -463,6 +473,8 @@ def _merge_a_into_b(a, b, root, key_list):
         isinstance(b, CfgNode),
         "`b` (cur type {}) must be an instance of {}".format(type(b), CfgNode),
     )
+    if b.is_frozen():
+        raise AttributeError("Attempted to merge into immutable CfgNode")
 
     for k, v_ in a.items():
         full_key = ".".join(key_list + [k])
