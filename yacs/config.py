@@ -241,7 +241,7 @@ class CfgNode(dict):
                 d = d[subkey]
             subkey = key_list[-1]
             _assert_with_logging(subkey in d, "Non-existent key: {}".format(full_key))
-            value = self._decode_cfg_value(v)
+            value = _decode_cfg_value_for_target(self, v, d[subkey])
             value = _check_and_coerce_cfg_value_type(value, d[subkey], subkey, full_key)
             d[subkey] = value
 
@@ -451,6 +451,19 @@ def _valid_type(value, allow_cfg_node=False):
     )
 
 
+def _decode_cfg_value_for_target(cfg, value, target):
+    """Decode `value` while preserving strings when the target key expects a `str`."""
+    decoded = cfg._decode_cfg_value(value)
+    if (
+        isinstance(target, str)
+        and isinstance(value, str)
+        and decoded is not None
+        and not isinstance(decoded, str)
+    ):
+        return value
+    return decoded
+
+
 def _merge_a_into_b(a, b, root, key_list):
     """Merge config dictionary a into config dictionary b, clobbering the
     options in b whenever they are also specified in a.
@@ -468,9 +481,9 @@ def _merge_a_into_b(a, b, root, key_list):
         full_key = ".".join(key_list + [k])
 
         v = copy.deepcopy(v_)
-        v = b._decode_cfg_value(v)
 
         if k in b:
+            v = _decode_cfg_value_for_target(b, v, b[k])
             v = _check_and_coerce_cfg_value_type(v, b[k], k, full_key)
             # Recursively merge dicts
             if isinstance(v, CfgNode):
@@ -481,7 +494,7 @@ def _merge_a_into_b(a, b, root, key_list):
             else:
                 b[k] = v
         elif b.is_new_allowed():
-            b[k] = v
+            b[k] = b._decode_cfg_value(v)
         else:
             if root.key_is_deprecated(full_key):
                 continue
