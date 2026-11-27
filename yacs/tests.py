@@ -351,6 +351,70 @@ class TestCfgNodeSubclass(unittest.TestCase):
         cfg.merge_from_other_cfg(cfg2)
         assert cfg.MODEL.TYPE == s
 
+    def test_merge_cfg_node_subclass_mismatch(self):
+        class SubCN2(CN):
+            pass
+
+        # Subclass target merged with base CfgNode
+        cfg = CN()
+        cfg.SUB = SubCN()
+        cfg.SUB.X = 1
+        cfg2 = CN()
+        cfg2.SUB = CN()
+        cfg2.SUB.X = 2
+        cfg.merge_from_other_cfg(cfg2)
+        assert cfg.SUB.X == 2
+        assert type(cfg.SUB) is SubCN
+
+        # Base CfgNode target merged with subclass
+        cfg = CN()
+        cfg.SUB = CN()
+        cfg.SUB.X = 1
+        cfg2 = CN()
+        cfg2.SUB = SubCN()
+        cfg2.SUB.X = 2
+        cfg.merge_from_other_cfg(cfg2)
+        assert cfg.SUB.X == 2
+        assert type(cfg.SUB) is CN
+
+        # Subclass target merged with same subclass inside base CfgNode
+        cfg = CN()
+        cfg.SUB = SubCN()
+        cfg.SUB.X = 1
+        cfg2 = CN()
+        cfg2.SUB = SubCN()
+        cfg2.SUB.X = 3
+        cfg.merge_from_other_cfg(cfg2)
+        assert cfg.SUB.X == 3
+        assert type(cfg.SUB) is SubCN
+
+        # new_allowed preserves subclass type
+        cfg = CN(new_allowed=True)
+        cfg2 = CN()
+        cfg2.SUB = SubCN()
+        cfg2.SUB.X = 4
+        cfg.merge_from_other_cfg(cfg2)
+        assert cfg.SUB.X == 4
+        assert type(cfg.SUB) is SubCN
+
+        # bool vs int must still raise ValueError despite bool subclassing int
+        cfg = CN()
+        cfg.FLAG = True
+        cfg2 = CN()
+        cfg2.FLAG = 1
+        with self.assertRaises(ValueError):
+            cfg.merge_from_other_cfg(cfg2)
+
+        # Sibling subclasses must still raise ValueError
+        cfg = CN()
+        cfg.SUB = SubCN()
+        cfg.SUB.X = 1
+        cfg2 = CN()
+        cfg2.SUB = SubCN2()
+        cfg2.SUB.X = 2
+        with self.assertRaises(ValueError):
+            cfg.merge_from_other_cfg(cfg2)
+
 
 if __name__ == "__main__":
     logging.basicConfig()
