@@ -1,4 +1,5 @@
 import logging
+import os
 import tempfile
 import unittest
 
@@ -308,6 +309,36 @@ TRAIN:
         cfg.set_new_allowed(True)
         cfg.merge_from_file("example/config_new_allowed_bad.yaml")
         assert cfg.KWARGS.Y.f == 4
+
+    def test_str_numeric_values(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            for seq_val in ("00", "03", "10", "True"):
+                cfg = CN()
+                cfg.seq = "01"
+                yaml_path = os.path.join(tmpdir, "cfg.yaml")
+                with open(yaml_path, "wt") as f:
+                    f.write("seq: '{}'\n".format(seq_val))
+                cfg.merge_from_file(yaml_path)
+                assert cfg.seq == seq_val
+
+            # Unquoted integer in YAML still raises ValueError against str default
+            cfg = CN()
+            cfg.seq = "01"
+            yaml_path = os.path.join(tmpdir, "cfg_int.yaml")
+            with open(yaml_path, "wt") as f:
+                f.write("seq: 10\n")
+            with self.assertRaises(ValueError):
+                cfg.merge_from_file(yaml_path)
+
+        # CLI list overrides also preserve numeric strings for str keys
+        cfg = CN()
+        cfg.seq = "01"
+        cfg.merge_from_list(["seq", "10"])
+        assert cfg.seq == "10"
+        cfg.merge_from_list(["seq", "00"])
+        assert cfg.seq == "00"
+        cfg.merge_from_list(["seq", "None"])
+        assert cfg.seq is None
 
 
 class TestCfgNodeSubclass(unittest.TestCase):
