@@ -235,14 +235,29 @@ class CfgNode(dict):
             key_list = full_key.split(".")
             d = self
             for subkey in key_list[:-1]:
-                _assert_with_logging(
-                    subkey in d, "Non-existent key: {}".format(full_key)
-                )
+                if subkey not in d:
+                    _assert_with_logging(
+                        d.is_new_allowed(), "Non-existent key: {}".format(full_key)
+                    )
+                    d[subkey] = self.__class__(new_allowed=d.is_new_allowed())
                 d = d[subkey]
             subkey = key_list[-1]
-            _assert_with_logging(subkey in d, "Non-existent key: {}".format(full_key))
+            if subkey not in d:
+                _assert_with_logging(
+                    d.is_new_allowed(), "Non-existent key: {}".format(full_key)
+                )
             value = self._decode_cfg_value(v)
-            value = _check_and_coerce_cfg_value_type(value, d[subkey], subkey, full_key)
+            if subkey in d:
+                value = _check_and_coerce_cfg_value_type(
+                    value, d[subkey], subkey, full_key
+                )
+            else:
+                _assert_with_logging(
+                    _valid_type(value, allow_cfg_node=True),
+                    "Invalid type {} for key {}; valid types = {}".format(
+                        type(value), full_key, _VALID_TYPES
+                    ),
+                )
             d[subkey] = value
 
     def freeze(self):

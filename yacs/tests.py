@@ -309,6 +309,23 @@ TRAIN:
         cfg.merge_from_file("example/config_new_allowed_bad.yaml")
         assert cfg.KWARGS.Y.f == 4
 
+    def test_new_allowed_from_list(self):
+        cfg = get_cfg()
+        cfg.merge_from_list(["KWARGS.a", 1, "KWARGS.B.c", 2, "KWARGS.B.D.e", "foo"])
+        assert cfg.KWARGS.a == 1
+        assert cfg.KWARGS.B.c == 2
+        assert cfg.KWARGS.B.D.e == "foo"
+
+        with self.assertRaises(AssertionError):
+            cfg.merge_from_list(["KWARGS.Y.f", 4])
+
+        with self.assertRaises(AssertionError):
+            cfg.merge_from_list(["KWARGS.bad", object()])
+
+        cfg.set_new_allowed(True)
+        cfg.merge_from_list(["KWARGS.Y.f", 4])
+        assert cfg.KWARGS.Y.f == 4
+
 
 class TestCfgNodeSubclass(unittest.TestCase):
     def test_merge_cfg_from_file(self):
