@@ -1,4 +1,5 @@
 import logging
+import os
 import tempfile
 import unittest
 
@@ -84,6 +85,47 @@ class TestCfgNode(unittest.TestCase):
             a.level1.level2.foo = 1
             a.level1.bar = 1
         assert a.level1.level2.foo == 0
+
+    def test_immutability_on_merge(self):
+        a = CN()
+        a.foo = 0
+        a.level1 = CN()
+        a.level1.foo = 0
+        a.freeze()
+
+        other = CN({"foo": 1, "level1": {"foo": 1}})
+        with self.assertRaises(AttributeError):
+            a.merge_from_other_cfg(other)
+        with self.assertRaises(AttributeError):
+            a.merge_from_list(["foo", 1])
+        with tempfile.TemporaryDirectory() as tmpdir:
+            yaml_path = os.path.join(tmpdir, "override.yaml")
+            with open(yaml_path, "wt") as f:
+                f.write("foo: 1\n")
+            with self.assertRaises(AttributeError):
+                a.merge_from_file(yaml_path)
+            assert a.foo == 0
+            assert a.level1.foo == 0
+
+            # Cloning a frozen config must still work, and defrosting allows merges
+            cloned = a.clone()
+            assert cloned.is_frozen()
+            cloned.defrost()
+            cloned.merge_from_file(yaml_path)
+            assert cloned.foo == 1
+            assert a.foo == 0
+
+        a.defrost()
+        a.level1.freeze()
+        with self.assertRaises(AttributeError):
+            a.merge_from_list(["level1.foo", 2])
+        with self.assertRaises(AttributeError):
+            a.merge_from_other_cfg(CN({"level1": {"foo": 2}}))
+        assert a.level1.foo == 0
+
+        a.defrost()
+        a.merge_from_list(["level1.foo", 2])
+        assert a.level1.foo == 2
 
 
 class TestCfg(unittest.TestCase):
